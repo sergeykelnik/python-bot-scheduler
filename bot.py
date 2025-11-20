@@ -60,6 +60,11 @@ class TelegramBot:
             'text': text,
             'parse_mode': parse_mode
         }
+        # Optional reply_markup support (pass a dict)
+        if isinstance(parse_mode, dict):
+            # If caller passed parse_mode accidentally as dict, ignore
+            pass
+        return self._post_json(url, data)
         try:
             response = requests.post(url, json=data)
             return response.json()
@@ -71,6 +76,48 @@ class TelegramBot:
         """Отправка запланированного сообщения"""
         logger.info(f"Sending scheduled message to {chat_id}")
         self.send_message(chat_id, message)
+
+    def _post_json(self, url, data):
+        try:
+            response = requests.post(url, json=data)
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error sending request to {url}: {e}")
+            return None
+
+    def send_message_with_markup(self, chat_id, text, reply_markup=None, parse_mode='Markdown'):
+        """Send message with optional inline keyboard (reply_markup as dict)."""
+        url = f"{self.base_url}/sendMessage"
+        data = {
+            'chat_id': chat_id,
+            'text': text,
+            'parse_mode': parse_mode
+        }
+        if reply_markup is not None:
+            data['reply_markup'] = reply_markup
+        return self._post_json(url, data)
+
+    def answer_callback_query(self, callback_query_id, text=None, show_alert=False):
+        """Answer a callback query to acknowledge the button press."""
+        url = f"{self.base_url}/answerCallbackQuery"
+        data = {'callback_query_id': callback_query_id, 'show_alert': show_alert}
+        if text:
+            data['text'] = text
+        return self._post_json(url, data)
+
+    def edit_message_text(self, chat_id, message_id, text, parse_mode='Markdown', reply_markup=None):
+        url = f"{self.base_url}/editMessageText"
+        data = {'chat_id': chat_id, 'message_id': message_id, 'text': text, 'parse_mode': parse_mode}
+        if reply_markup is not None:
+            data['reply_markup'] = reply_markup
+        return self._post_json(url, data)
+
+    def edit_message_reply_markup(self, chat_id, message_id, reply_markup=None):
+        url = f"{self.base_url}/editMessageReplyMarkup"
+        data = {'chat_id': chat_id, 'message_id': message_id}
+        if reply_markup is not None:
+            data['reply_markup'] = reply_markup
+        return self._post_json(url, data)
     
     def get_updates(self, offset=None, timeout=30):
         """Получение обновлений от Telegram"""
@@ -85,18 +132,31 @@ class TelegramBot:
     
     def process_update(self, update):
         """Обработка одного обновления"""
+        # Support both message updates and callback_query updates
+        if 'callback_query' in update:
+            cq = update['callback_query']
+            cq_id = cq['id']
+            from_user = cq['from']['id']
+            data = cq.get('data')
+            message = cq.get('message')
+            chat_id = message['chat']['id'] if message and 'chat' in message else None
+            message_id = message['message_id'] if message else None
+            # Let handlers process callback queries
+            self.handlers.handle_callback_query(cq, cq_id, from_user, chat_id, message_id, data)
+            return
+
         if 'message' not in update:
             return
-        
+
         message = update['message']
         chat_id = message['chat']['id']
         user_id = message['from']['id']
         
         if 'text' not in message:
             return
-        
+
         text = message['text']
-        
+
         # Обработка команд
         if text.startswith('/'):
             command_parts = text.split()

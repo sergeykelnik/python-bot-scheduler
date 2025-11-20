@@ -93,90 +93,175 @@ class MessageHandlers:
     
     def handle_manage(self, chat_id, user_id):
         """Обработка команды /manage - показать интерактивный список"""
-        user_jobs = {k: v for k, v in self.bot.scheduler.scheduled_jobs.items() 
-                     if v['user_id'] == user_id}
-        
+        user_jobs = {k: v for k, v in self.bot.scheduler.scheduled_jobs.items() if v['user_id'] == user_id}
+
         if not user_jobs:
             self.bot.send_message(chat_id, "У вас нет расписаний для управления.")
             return
-        
-        # Сохраняем jobs для этой сессии управления
-        user_states[user_id] = {
-            'step': 'manage_select',
-            'management_jobs': list(user_jobs.keys())
-        }
-        
-        text = "🛠️ *Управление расписаниями*\n\nВыберите расписание:\n\n"
-        
-        for i, job_id in enumerate(user_jobs.keys(), 1):
-            job_info = user_jobs[job_id]
-            status = "⏸️ ПРИОСТАНОВЛЕНО" if job_info['is_paused'] else "✅ АКТИВНО"
-            text += f"{i}. `{job_id}`\n"
-            text += f"   Статус: {status}\n"
-            text += f"   Сообщение: {job_info['message'][:30]}...\n"
-            text += f"   Расписание: {job_info['schedule']}\n\n"
-        
-        text += "Введите номер расписания для управления:"
-        self.bot.send_message(chat_id, text)
+
+        # Для каждого расписания отправляем отдельное сообщение с inline-кнопками
+        for job_id, job_info in user_jobs.items():
+            text = self._build_job_text(job_id, job_info)
+            markup = self._build_job_markup(job_id, job_info)
+            # send a separate message per job with inline buttons
+            self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_manage_selection(self, chat_id, user_id, selection):
-        """Обработка выбора работы в режиме управления"""
-        try:
-            job_index = int(selection) - 1
-            management_jobs = user_states[user_id]['management_jobs']
-            
-            if 0 <= job_index < len(management_jobs):
-                job_id = management_jobs[job_index]
-                job_info = self.bot.scheduler.scheduled_jobs[job_id]
-                
-                # Сохраняем выбранную работу для действия
-                user_states[user_id] = {
-                    'step': 'manage_action',
-                    'selected_job': job_id
-                }
-                
-                status = "⏸️ ПРИОСТАНОВЛЕНО" if job_info['is_paused'] else "✅ АКТИВНО"
-                pause_resume_text = "⏸️ Приостановить" if not job_info['is_paused'] else "▶️ Возобновить"
-                
-                text = f"🛠️ *Управление расписанием:*\n\n"
-                text += f"ID: `{job_id}`\n"
-                text += f"Статус: {status}\n"
-                text += f"Цель: {job_info['chat_id']}\n"
-                text += f"Сообщение: {job_info['message']}\n"
-                text += f"Расписание: {job_info['schedule']}\n\n"
-                text += f"Выберите действие:\n"
-                text += f"1. 🗑️ Удалить\n"
-                text += f"2. {pause_resume_text}\n"
-                text += f"3. ↩️ Назад к списку"
-                
-                self.bot.send_message(chat_id, text)
-            else:
-                self.bot.send_message(chat_id, "❌ Неверный номер. Пожалуйста, выберите номер из списка.")
-        except ValueError:
-            self.bot.send_message(chat_id, "❌ Пожалуйста, введите номер расписания.")
+        """(Устаревший) выбор работы больше не используется."""
     
     def handle_manage_action(self, chat_id, user_id, action):
-        """Обработка выбора действия в режиме управления"""
-        job_id = user_states[user_id]['selected_job']
-        
-        if action == '1':  # Удалить
-            self.delete_job(chat_id, user_id, job_id)
-            del user_states[user_id]
-        
-        elif action == '2':  # Пауза/Возобновить
-            self.toggle_job_pause(chat_id, user_id, job_id)
-            # Возвращаемся к списку управления
-            self.handle_manage(chat_id, user_id)
-        
-        elif action == '3':  # Назад к списку
-            self.handle_manage(chat_id, user_id)
-        
-        else:
-            self.bot.send_message(chat_id, "❌ Неверное действие. Пожалуйста, выберите 1, 2 или 3.")
+        """(Устаревший) действие управления через ввод номера не поддерживается."""
     
     def handle_getchatid(self, chat_id, user_id):
         """Обработка команды /getchatid"""
         self.bot.send_message(chat_id, f"ID этого чата: `{chat_id}`")
+
+    # --- Helpers for interactive manage ---
+    def _build_job_text(self, job_id, job_info):
+        status = "⏸️ ПРИОСТАНОВЛЕНО" if job_info.get('is_paused') else "✅ АКТИВНО"
+        text = (
+            f"*ID:* `{job_id}`\n"
+            f"*Статус:* {status}\n"
+            f"*Цель:* {job_info.get('chat_id')}\n"
+            f"*Сообщение:* {job_info.get('message')}\n"
+            f"*Расписание:* {job_info.get('schedule')}\n"
+        )
+        return text
+
+    def _build_job_markup(self, job_id, job_info):
+        # Return inline keyboard depending on paused status
+        if job_info.get('is_paused'):
+            buttons = [
+                {'text': '▶️ Возобновить', 'callback_data': f'manage:resume:{job_id}'},
+                {'text': '🗑️ Удалить', 'callback_data': f'manage:delete:{job_id}'}
+            ]
+        else:
+            buttons = [
+                {'text': '⏸️ Приостановить', 'callback_data': f'manage:pause:{job_id}'},
+                {'text': '🗑️ Удалить', 'callback_data': f'manage:delete:{job_id}'}
+            ]
+
+        # Inline keyboard uses rows; put two buttons on one row
+        return {'inline_keyboard': [buttons]}
+
+    def handle_callback_query(self, cq, cq_id, from_user, chat_id, message_id, data):
+        """Обработка callback_query от inline-кнопок управления.
+
+        data examples:
+        - 'manage:pause:<job_id>'
+        - 'manage:resume:<job_id>'
+        - 'manage:delete:<job_id>' (will ask confirmation by editing the same message)
+        - 'confirm_delete:<job_id>'
+        - 'cancel_delete:<job_id>'
+        """
+        try:
+            if not data:
+                self.bot.answer_callback_query(cq_id)
+                return
+
+            parts = data.split(':')
+            action = parts[0]
+
+            if action == 'manage' and len(parts) == 3:
+                subaction, job_id = parts[1], parts[2]
+
+                # Permission check
+                job = self.bot.scheduler.scheduled_jobs.get(job_id)
+                if not job:
+                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
+                    return
+                if job.get('user_id') != from_user:
+                    self.bot.answer_callback_query(cq_id, text='У вас нет прав для этого действия', show_alert=True)
+                    return
+
+                if subaction == 'pause':
+                    success = self.bot.scheduler.pause_job(job_id)
+                    if success:
+                        job['is_paused'] = True
+                        self.bot.db.update_schedule_pause_status(job_id, True)
+                        new_text = self._build_job_text(job_id, job)
+                        new_markup = self._build_job_markup(job_id, job)
+                        self.bot.edit_message_text(chat_id, message_id, new_text, parse_mode='Markdown', reply_markup=new_markup)
+                        self.bot.answer_callback_query(cq_id, text='Расписание приостановлено')
+                    else:
+                        self.bot.answer_callback_query(cq_id, text='Ошибка при приостановке', show_alert=True)
+
+                elif subaction == 'resume':
+                    # Load schedule data from DB
+                    schedules = self.bot.db.get_user_schedules(from_user)
+                    target = None
+                    for s in schedules:
+                        if s['job_id'] == job_id:
+                            target = s
+                            break
+                    if not target:
+                        self.bot.answer_callback_query(cq_id, text='Расписание не найдено в базе', show_alert=True)
+                        return
+                    success = self.bot.scheduler.resume_job(job_id, target['schedule_type'], target['schedule_data'], target['chat_id'], target['message'])
+                    if success:
+                        job['is_paused'] = False
+                        self.bot.db.update_schedule_pause_status(job_id, False)
+                        new_text = self._build_job_text(job_id, job)
+                        new_markup = self._build_job_markup(job_id, job)
+                        self.bot.edit_message_text(chat_id, message_id, new_text, parse_mode='Markdown', reply_markup=new_markup)
+                        self.bot.answer_callback_query(cq_id, text='Расписание возобновлено')
+                    else:
+                        self.bot.answer_callback_query(cq_id, text='Ошибка при возобновлении', show_alert=True)
+
+                elif subaction == 'delete':
+                    # Edit the same message to ask for confirmation
+                    confirm_text = f"⚠️ Подтвердите удаление расписания `{job_id}`\n\n" + self._build_job_text(job_id, job)
+                    confirm_markup = {'inline_keyboard': [[
+                        {'text': '✅ Подтвердить удаление', 'callback_data': f'confirm_delete:{job_id}'},
+                        {'text': '❌ Отмена', 'callback_data': f'cancel_delete:{job_id}'}
+                    ]]}
+                    self.bot.edit_message_text(chat_id, message_id, confirm_text, parse_mode='Markdown', reply_markup=confirm_markup)
+                    self.bot.answer_callback_query(cq_id)
+                else:
+                    self.bot.answer_callback_query(cq_id)
+
+            elif action == 'confirm_delete' and len(parts) == 2:
+                job_id = parts[1]
+                job = self.bot.scheduler.scheduled_jobs.get(job_id)
+                if not job:
+                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
+                    return
+                if job.get('user_id') != from_user:
+                    self.bot.answer_callback_query(cq_id, text='У вас нет прав для этого действия', show_alert=True)
+                    return
+
+                # Proceed to delete
+                self.bot.scheduler.delete_job(job_id)
+                self.bot.db.delete_schedule(job_id)
+                # remove from memory
+                del self.bot.scheduler.scheduled_jobs[job_id]
+                # Edit message to indicate deletion
+                del_text = f"✅ Расписание `{job_id}` удалено"
+                self.bot.edit_message_text(chat_id, message_id, del_text, parse_mode='Markdown', reply_markup={})
+                self.bot.answer_callback_query(cq_id, text='Расписание удалено')
+
+            elif action == 'cancel_delete' and len(parts) == 2:
+                job_id = parts[1]
+                job = self.bot.scheduler.scheduled_jobs.get(job_id)
+                if not job:
+                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
+                    return
+                # restore original message and buttons
+                orig_text = self._build_job_text(job_id, job)
+                orig_markup = self._build_job_markup(job_id, job)
+                self.bot.edit_message_text(chat_id, message_id, orig_text, parse_mode='Markdown', reply_markup=orig_markup)
+                self.bot.answer_callback_query(cq_id, text='Отменено')
+
+            else:
+                # Unknown action
+                self.bot.answer_callback_query(cq_id)
+
+        except Exception as e:
+            logger.error(f"Error handling callback query: {e}")
+            try:
+                self.bot.answer_callback_query(cq_id, text='Внутренняя ошибка', show_alert=True)
+            except Exception:
+                pass
     
     def handle_text_message(self, chat_id, user_id, text):
         """Обработка текстовых сообщений для мастера планирования и управления"""
