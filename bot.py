@@ -23,6 +23,34 @@ class TelegramBot:
         self.handlers = MessageHandlers(self)
         
         self.last_update_id = 0
+        
+        # Устанавливаем меню команд при инициализации
+        self.set_bot_commands()
+    
+    def set_bot_commands(self):
+        """Установка меню команд бота"""
+        commands = [
+            {"command": "start", "description": "🚀 Запустить бота"},
+            {"command": "help", "description": "📖 Помощь и инструкции"},
+            {"command": "schedule", "description": "📅 Создать расписание"},
+            {"command": "list", "description": "📋 Мои расписания"},
+            {"command": "manage", "description": "⚙️ Управление расписаниями"},
+            {"command": "getchatid", "description": "🆔 Получить ID чата"}
+        ]
+        
+        url = f"{self.base_url}/setMyCommands"
+        data = {
+            "commands": commands
+        }
+        
+        try:
+            response = requests.post(url, json=data)
+            if response.status_code == 200:
+                logger.info("✅ Меню команд бота успешно настроено")
+            else:
+                logger.error(f"❌ Ошибка настройки меню команд: {response.text}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при настройке меню команд: {e}")
     
     def send_message(self, chat_id, text, parse_mode='Markdown'):
         """Отправка сообщения в чат"""
