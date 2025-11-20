@@ -78,68 +78,95 @@ class SchedulerManager:
     
     def create_daily_schedule(self, job_id, chat_id, message, hour, minute):
         """Создание ежедневного расписания"""
-        self.scheduler.add_job(
-            self.bot.send_scheduled_message,
-            CronTrigger(hour=hour, minute=minute, timezone=WARSAW_TZ),
-            args=[chat_id, message],
-            id=job_id
-        )
-        return {'hour': hour, 'minute': minute, 'description': f"Ежедневно в {hour:02d}:{minute:02d} (Europe/Warsaw)"}
+        try:
+            self.scheduler.add_job(
+                self.bot.send_scheduled_message,
+                CronTrigger(hour=hour, minute=minute, timezone=WARSAW_TZ),
+                args=[chat_id, message],
+                id=job_id
+            )
+            return {'hour': hour, 'minute': minute, 'description': f"Ежедневно в {hour:02d}:{minute:02d} (Europe/Warsaw)"}
+        except Exception as e:
+            logger.error(f"Error creating daily schedule: {e}")
+            raise
     
     def create_interval_schedule(self, job_id, chat_id, message, interval, unit):
         """Создание интервального расписания"""
-        if unit == 'hours':
-            trigger = IntervalTrigger(hours=interval, timezone=WARSAW_TZ)
-            unit_desc = 'час(ов)'
-            schedule_unit = 'hours'
-        elif unit == 'minutes':
-            trigger = IntervalTrigger(minutes=interval, timezone=WARSAW_TZ)
-            unit_desc = 'минут(ы)'
-            schedule_unit = 'minutes'
-        elif unit == 'seconds':
-            trigger = IntervalTrigger(seconds=interval, timezone=WARSAW_TZ)
-            unit_desc = 'секунд(ы)'
-            schedule_unit = 'seconds'
-        
-        self.scheduler.add_job(
-            self.bot.send_scheduled_message,
-            trigger,
-            args=[chat_id, message],
-            id=job_id
-        )
-        return {'interval': interval, 'unit': schedule_unit, 'description': f"Каждые {interval} {unit_desc} (Europe/Warsaw)"}
+        try:
+            if unit == 'hours':
+                trigger = IntervalTrigger(hours=interval, timezone=WARSAW_TZ)
+                unit_desc = 'час(ов)'
+                schedule_unit = 'hours'
+            elif unit == 'minutes':
+                trigger = IntervalTrigger(minutes=interval, timezone=WARSAW_TZ)
+                unit_desc = 'минут(ы)'
+                schedule_unit = 'minutes'
+            elif unit == 'seconds':
+                trigger = IntervalTrigger(seconds=interval, timezone=WARSAW_TZ)
+                unit_desc = 'секунд(ы)'
+                schedule_unit = 'seconds'
+            
+            self.scheduler.add_job(
+                self.bot.send_scheduled_message,
+                trigger,
+                args=[chat_id, message],
+                id=job_id
+            )
+            return {'interval': interval, 'unit': schedule_unit, 'description': f"Каждые {interval} {unit_desc} (Europe/Warsaw)"}
+        except Exception as e:
+            logger.error(f"Error creating interval schedule: {e}")
+            raise
     
     def create_cron_schedule(self, job_id, chat_id, message, cron_expression):
         """Создание cron расписания"""
-        self.scheduler.add_job(
-            self.bot.send_scheduled_message,
-            CronTrigger.from_crontab(cron_expression, timezone=WARSAW_TZ),
-            args=[chat_id, message],
-            id=job_id
-        )
-        return {'expression': cron_expression, 'description': f"Cron: {cron_expression} (Europe/Warsaw)"}
+        try:
+            self.scheduler.add_job(
+                self.bot.send_scheduled_message,
+                CronTrigger.from_crontab(cron_expression, timezone=WARSAW_TZ),
+                args=[chat_id, message],
+                id=job_id
+            )
+            return {'expression': cron_expression, 'description': f"Cron: {cron_expression} (Europe/Warsaw)"}
+        except Exception as e:
+            logger.error(f"Error creating cron schedule: {e}")
+            raise
     
     def pause_job(self, job_id):
         """Приостановка работы"""
-        if self.scheduler.get_job(job_id):
-            self.scheduler.remove_job(job_id)
-        return True
+        try:
+            if self.scheduler.get_job(job_id):
+                self.scheduler.remove_job(job_id)
+                logger.info(f"Job {job_id} paused successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error pausing job {job_id}: {e}")
+            return False
     
     def resume_job(self, job_id, schedule_type, schedule_data, chat_id, message):
         """Возобновление работы"""
-        if schedule_type == 'daily':
-            self.create_daily_schedule(job_id, chat_id, message, schedule_data['hour'], schedule_data['minute'])
-        elif schedule_type == 'interval':
-            self.create_interval_schedule(job_id, chat_id, message, schedule_data['interval'], schedule_data['unit'])
-        elif schedule_type == 'cron':
-            self.create_cron_schedule(job_id, chat_id, message, schedule_data['expression'])
-        return True
+        try:
+            if schedule_type == 'daily':
+                self.create_daily_schedule(job_id, chat_id, message, schedule_data['hour'], schedule_data['minute'])
+            elif schedule_type == 'interval':
+                self.create_interval_schedule(job_id, chat_id, message, schedule_data['interval'], schedule_data['unit'])
+            elif schedule_type == 'cron':
+                self.create_cron_schedule(job_id, chat_id, message, schedule_data['expression'])
+            
+            logger.info(f"Job {job_id} resumed successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error resuming job {job_id}: {e}")
+            return False
     
     def delete_job(self, job_id):
         """Удаление работы из планировщика"""
-        if self.scheduler.get_job(job_id):
-            self.scheduler.remove_job(job_id)
-        return True
+        try:
+            if self.scheduler.get_job(job_id):
+                self.scheduler.remove_job(job_id)
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting job {job_id}: {e}")
+            return False
     
     def start(self):
         """Запуск планировщика"""

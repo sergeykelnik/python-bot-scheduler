@@ -224,25 +224,44 @@ class MessageHandlers:
             schedule_type = ""
             
             # Парсинг ежедневного расписания
-            if schedule_text.startswith('daily'):
+            schedule_text = schedule_text.strip()
+            schedule_text_lower = schedule_text.lower()
+
+            if schedule_text_lower.startswith('daily'):
                 parts = schedule_text.split()
                 if len(parts) < 2:
-                    raise ValueError("Format: daily HH:MM")
+                    raise ValueError("Формат: daily HH:MM (например: daily 09:00)")
                 time_str = parts[1]
+
+                # Проверка формата времени
+                if ':' not in time_str:
+                    raise ValueError("Неверный формат времени. Используйте HH:MM")
+
                 hour, minute = map(int, time_str.split(':'))
-                
+
+                # Проверка валидности времени
+                if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+                    raise ValueError("Неверное время. Часы должны быть от 0 до 23, минуты от 0 до 59")
+
                 schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
                 schedule_type = 'daily'
-            
+
             # Парсинг интервального расписания
-            elif schedule_text.startswith('every'):
+            elif schedule_text_lower.startswith('every'):
                 parts = schedule_text.split()
-                if len(parts) < 2:
-                    raise ValueError("Format: every X hours/minutes")
-                
-                interval = int(parts[1])
-                unit = parts[2] if len(parts) > 2 else 'hours'
-                
+                if len(parts) < 3:
+                    raise ValueError("Формат: every X hours/minutes/seconds (например: every 10 seconds)")
+
+                try:
+                    interval = int(parts[1])
+                except ValueError:
+                    raise ValueError("Интервал должен быть числом (например: every 10 seconds)")
+
+                if interval <= 0:
+                    raise ValueError("Интервал должен быть положительным числом")
+
+                unit = parts[2].lower()
+
                 # Нормализация единицы измерения
                 if unit.startswith('hour'):
                     schedule_unit = 'hours'
@@ -251,13 +270,18 @@ class MessageHandlers:
                 elif unit.startswith('second'):
                     schedule_unit = 'seconds'
                 else:
-                    raise ValueError("Unit must be hours, minutes, or seconds")
-                
+                    raise ValueError("Единица измерения должна быть: hours, minutes или seconds")
+
                 schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, schedule_unit)
                 schedule_type = 'interval'
-            
+
             # Парсинг cron выражения
             else:
+                # Базовая проверка cron выражения
+                cron_parts = schedule_text.split()
+                if len(cron_parts) != 5:
+                    raise ValueError("Cron выражение должно содержать 5 частей (например: 0 9 * * MON)")
+
                 schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
                 schedule_type = 'cron'
             
@@ -295,8 +319,13 @@ class MessageHandlers:
             del user_states[user_id]
             
         except Exception as e:
-            self.bot.send_message(chat_id, f"❌ Ошибка при создании расписания: {e}\n\nПожалуйста, попробуйте снова с /schedule")
-            del user_states[user_id]
+            error_message = f"❌ Ошибка при создании расписания: {e}\n\nПожалуйста, попробуйте снова с /schedule"
+            self.bot.send_message(chat_id, error_message)
+            logger.error(f"Error creating schedule: {e}")
+            
+            # Очищаем состояние пользователя при ошибке
+            if user_id in user_states:
+                del user_states[user_id]
     
     def delete_job(self, chat_id, user_id, job_id):
         """Удаление работы полностью"""
@@ -326,34 +355,55 @@ class MessageHandlers:
                 
                 if is_paused:
                     # Возобновляем работу - воссоздаем в планировщике
-                    db_schedule = next((s for s in self.bot.db.get_user_schedules(user_id) if s['job_id'] == job_id), None)
-                    if db_schedule:
-                        self.bot.scheduler.resume_job(
-                            job_id, 
-                            db_schedule['schedule_type'], 
-                            db_schedule['schedule_data'],
-                            job_info['chat_id'],
-                            job_info['message']
-                        )
-                        
+                    db_schedule = self.bot.db.get_user_schedules(user_id)
+                    if not db_schedule:
+                        self.bot.send_message(chat_id, "❌ Ошибка: у вас нет расписаний в базе данных.")
+                        return
+                    
+                    # Ищем конкретное расписание
+                    target_schedule = None
+                    for schedule in db_schedule:
+                        if schedule['job_id'] == job_id:
+                            target_schedule = schedule
+                            break
+                    
+                    if not target_schedule:
+                        self.bot.send_message(chat_id, "❌ Ошибка: расписание не найдено в базе данных.")
+                        return
+                    
+                    # Восстанавливаем работу в планировщике
+                    success = self.bot.scheduler.resume_job(
+                        job_id, 
+                        target_schedule['schedule_type'], 
+                        target_schedule['schedule_data'],
+                        job_info['chat_id'],
+                        job_info['message']
+                    )
+                    
+                    if success:
                         # Обновляем в памяти и базе данных
                         self.bot.scheduler.scheduled_jobs[job_id]['is_paused'] = False
                         self.bot.db.update_schedule_pause_status(job_id, False)
                         
                         self.bot.send_message(chat_id, f"▶️ Расписание `{job_id}` возобновлено!")
                     else:
-                        self.bot.send_message(chat_id, "❌ Ошибка: расписание не найдено в базе данных.")
+                        self.bot.send_message(chat_id, f"❌ Ошибка при возобновлении расписания `{job_id}`")
                 
                 else:
                     # Приостанавливаем работу - удаляем из планировщика но оставляем в памяти и базе данных
-                    self.bot.scheduler.pause_job(job_id)
+                    success = self.bot.scheduler.pause_job(job_id)
                     
-                    # Обновляем в памяти и базе данных
-                    self.bot.scheduler.scheduled_jobs[job_id]['is_paused'] = True
-                    self.bot.db.update_schedule_pause_status(job_id, True)
-                    
-                    self.bot.send_message(chat_id, f"⏸️ Расписание `{job_id}` приостановлено!")
+                    if success:
+                        # Обновляем в памяти и базе данных
+                        self.bot.scheduler.scheduled_jobs[job_id]['is_paused'] = True
+                        self.bot.db.update_schedule_pause_status(job_id, True)
+                        
+                        self.bot.send_message(chat_id, f"⏸️ Расписание `{job_id}` приостановлено!")
+                    else:
+                        self.bot.send_message(chat_id, f"❌ Ошибка при приостановке расписания `{job_id}`")
             else:
                 self.bot.send_message(chat_id, "❌ Расписание не найдено или у вас нет прав.")
         except Exception as e:
-            self.bot.send_message(chat_id, f"❌ Ошибка при изменении статуса расписания: {e}")
+            error_msg = f"❌ Ошибка при изменении статуса расписания: {e}"
+            self.bot.send_message(chat_id, error_msg)
+            logger.error(f"Error toggling job pause: {e}")
