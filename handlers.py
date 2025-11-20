@@ -16,14 +16,24 @@ class MessageHandlers:
         """Обработка команды /start"""
         text = (
             "🤖 *Бот планирования сообщений*\n\n"
-            "Команды:\n"
-            "/schedule - Создать новое расписание\n"
-            "/list - Показать активные расписания\n"
-            "/manage - Управление расписаниями (удалить, приостановить, возобновить)\n"
-            "/getchatid - Получить ID текущего чата\n"
-            "/help - Подробная помощь"
+            "Выберите действие ниже или используйте команды в чате."
         )
-        self.bot.send_message(chat_id, text)
+        markup = {
+            'inline_keyboard': [
+                [
+                    {'text': '📅 Создать', 'callback_data': 'cmd:schedule'},
+                    {'text': '📋 Мои расписания', 'callback_data': 'cmd:list'}
+                ],
+                [
+                    {'text': '⚙️ Управление', 'callback_data': 'cmd:manage'},
+                    {'text': '🆔 Получить ID', 'callback_data': 'cmd:getchatid'}
+                ],
+                [
+                    {'text': '📖 Помощь', 'callback_data': 'cmd:help'}
+                ]
+            ]
+        }
+        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_help(self, chat_id, user_id):
         """Обработка команды /help"""
@@ -56,7 +66,13 @@ class MessageHandlers:
             "Подсказка: для сложных cron-выражений используйте генераторы, например http://www.cronmaker.com/."
         )
         
-        self.bot.send_message(chat_id, text)
+        # Добавим быстрые кнопки команд внизу помощи
+        markup = {'inline_keyboard': [[
+            {'text': '📅 Создать', 'callback_data': 'cmd:schedule'},
+            {'text': '📋 Мои расписания', 'callback_data': 'cmd:list'},
+            {'text': '⚙️ Управление', 'callback_data': 'cmd:manage'}
+        ]]}
+        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_schedule(self, chat_id, user_id):
         """Обработка команды /schedule"""
@@ -64,10 +80,14 @@ class MessageHandlers:
         text = (
             "📝 Давайте создадим расписание!\n\n"
             "Шаг 1: Введите целевой chat ID\n"
-            "(Используйте 'me', чтобы отправить себе, или укажите chat ID)\n\n"
-            "Подсказка: используйте /getchatid, чтобы узнать ID чата"
+            "(Используйте 'me', чтобы отправить себе, или укажите chat ID)"
         )
-        self.bot.send_message(chat_id, text)
+        # Добавим кнопку получения chat_id и кнопку 'me' для отправки себе
+        markup = {'inline_keyboard': [[
+            {'text': '🆔 Получить ID чата', 'callback_data': 'cmd:getchatid'},
+            {'text': '👤 Мне (me)', 'callback_data': 'schedule:me'}
+        ]]}
+        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_list(self, chat_id, user_id):
         """Обработка команды /list"""
@@ -89,7 +109,9 @@ class MessageHandlers:
             text += f"─────────────\n"
         
         text += "\nИспользуйте /manage для управления расписаниями"
-        self.bot.send_message(chat_id, text)
+        # Добавим кнопку управления после списка
+        markup = {'inline_keyboard': [[{'text': '⚙️ Управление', 'callback_data': 'cmd:manage'}]]}
+        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_manage(self, chat_id, user_id):
         """Обработка команды /manage - показать интерактивный список"""
@@ -161,6 +183,38 @@ class MessageHandlers:
 
             parts = data.split(':')
             action = parts[0]
+
+            # Quick schedule actions (e.g. send to 'me')
+            if action == 'schedule' and len(parts) >= 2:
+                sub = parts[1]
+                # set the user's target chat to the current chat (me)
+                if sub == 'me':
+                    # initialize or update state to step 'message'
+                    user_states[from_user] = {'step': 'message', 'chat_id': chat_id}
+                    # acknowledge and prompt for message text
+                    self.bot.answer_callback_query(cq_id)
+                    self.bot.send_message(chat_id, "Шаг 2: Введите сообщение, которое хотите отправить:")
+                    return
+
+            # Generic command buttons (from main menu/help etc.)
+            if action == 'cmd' and len(parts) >= 2:
+                cmd = parts[1]
+                # acknowledge button press
+                self.bot.answer_callback_query(cq_id)
+                if cmd == 'schedule':
+                    self.handle_schedule(chat_id, from_user)
+                elif cmd == 'list':
+                    self.handle_list(chat_id, from_user)
+                elif cmd == 'manage':
+                    self.handle_manage(chat_id, from_user)
+                elif cmd == 'getchatid':
+                    self.handle_getchatid(chat_id, from_user)
+                elif cmd == 'help':
+                    self.handle_help(chat_id, from_user)
+                else:
+                    # unknown command
+                    self.bot.answer_callback_query(cq_id)
+                return
 
             if action == 'manage' and len(parts) == 3:
                 subaction, job_id = parts[1], parts[2]
@@ -284,10 +338,10 @@ class MessageHandlers:
                 chat_id,
                 "Шаг 3: Выберите тип расписания:\n\n"
                 "Примеры:\n"
-                "• `daily 09:00` - Ежедневно в 09:00\n"
-                "• `every 30 minutes` - Каждые 30 минут\n"
-                "• `every 2 hours` - Каждые 2 часа\n"
-                "• `0 9 * * MON` - Каждый понедельник в 09:00 (cron)\n\n"
+                "`daily 09:00` - Ежедневно в 09:00\n"
+                "`every 30 minutes` - Каждые 30 минут\n"
+                "`every 2 hours` - Каждые 2 часа\n"
+                "`0 9 * * MON` - Каждый понедельник в 09:00 (cron)\n\n"
                 "Введите ваше расписание:"
             )
         
@@ -391,15 +445,23 @@ class MessageHandlers:
                 is_paused=False
             )
             
-            self.bot.send_message(
-                chat_id,
+            # Send success message with quick action buttons
+            success_text = (
                 f"✅ *Расписание успешно создано!*\n\n"
                 f"ID: `{job_id}`\n"
                 f"Расписание: {schedule_data['description']}\n"
-                f"Цель: {state['chat_id']}\n\n"
-                f"Используйте /list, чтобы увидеть все расписания\n"
-                f"Используйте /manage для управления расписаниями"
+                f"Цель: {state['chat_id']}\n"
             )
+            success_markup = {'inline_keyboard': [
+                [
+                    {'text': '📋 Мои расписания', 'callback_data': 'cmd:list'},
+                    {'text': '⚙️ Управление', 'callback_data': 'cmd:manage'}
+                ],
+                [
+                    {'text': '🗑️ Отменить это расписание', 'callback_data': f'manage:delete:{job_id}'}
+                ]
+            ]}
+            self.bot.send_message_with_markup(chat_id, success_text, reply_markup=success_markup, parse_mode='Markdown')
             
             # Очищаем состояние пользователя
             del user_states[user_id]
