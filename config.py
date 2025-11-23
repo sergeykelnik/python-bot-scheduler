@@ -10,16 +10,19 @@ load_dotenv()
 # Настройки времени
 WARSAW_TZ = pytz.timezone('Europe/Warsaw')
 
-# Токен бота из переменных окружения
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+# Токен бота из переменных окружения. Если не установлен — используем явный
+# маркер чтобы основной модуль (`bot.py`) мог проверить и показать
+# понятное сообщение пользователю instead of raising at import time.
+BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or 'YOUR_BOT_TOKEN_HERE'
 
 # Настройки базы данных
 DB_PATH = 'schedules.db'
 
 # Логирование
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-LOG_LEVEL = 'INFO'
+# Default level name; callers may pass this string to `logging` or resolve it
+# to an integer level via `getattr(logging, LOG_LEVEL)`.
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
-# Проверка токена
-if not BOT_TOKEN or BOT_TOKEN == 'your_actual_bot_token_here':
-    raise ValueError("TELEGRAM_BOT_TOKEN not set in .env file")
+# Путь к БД можно переопределить через env
+DB_PATH = os.getenv('SCHEDULES_DB_PATH', DB_PATH)

@@ -8,8 +8,9 @@ from scheduler import SchedulerManager
 from handlers import MessageHandlers, user_states
 from config import BOT_TOKEN, LOG_FORMAT, LOG_LEVEL
 
-# Настройка логирования
-logging.basicConfig(format=LOG_FORMAT, level=LOG_LEVEL)
+# Настройка логирования — поддерживаем как строковые, так и числовые уровни
+log_level = getattr(logging, LOG_LEVEL) if isinstance(LOG_LEVEL, str) else LOG_LEVEL
+logging.basicConfig(format=LOG_FORMAT, level=log_level)
 logger = logging.getLogger(__name__)
 
 class TelegramBot:
@@ -52,25 +53,23 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"❌ Ошибка при настройке меню команд: {e}")
     
-    def send_message(self, chat_id, text, parse_mode='Markdown'):
-        """Отправка сообщения в чат"""
+    def send_message(self, chat_id, text, parse_mode: str = 'Markdown', reply_markup: dict = None):
+        """Отправка сообщения в чат.
+
+        `reply_markup` — опциональная структура inline клавиатуры или других
+        параметров (как словарь). Возвращает распарсенный JSON ответа Telegram
+        или None при ошибке.
+        """
         url = f"{self.base_url}/sendMessage"
         data = {
             'chat_id': chat_id,
             'text': text,
             'parse_mode': parse_mode
         }
-        # Optional reply_markup support (pass a dict)
-        if isinstance(parse_mode, dict):
-            # If caller passed parse_mode accidentally as dict, ignore
-            pass
+        if reply_markup is not None:
+            data['reply_markup'] = reply_markup
+
         return self._post_json(url, data)
-        try:
-            response = requests.post(url, json=data)
-            return response.json()
-        except Exception as e:
-            logger.error(f"Error sending message: {e}")
-            return None
     
     def send_scheduled_message(self, chat_id, message):
         """Отправка запланированного сообщения"""
