@@ -36,7 +36,7 @@ class ScheduleManager:
         Raises:
             Exception: If parsing fails or API returns invalid format
         """
-        prompt = f"""Convert the following schedule description into a cron expression.
+        prompt = f"""Convert the following schedule description into a cron expression. If description is not clear or it's not possible to create cron expression, return short error message.
 
 Text: "{schedule_text}"
 

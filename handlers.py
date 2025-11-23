@@ -190,7 +190,7 @@ class MessageHandlers:
                     user_states[from_user] = {'step': 'message', 'chat_id': chat_id}
                     # acknowledge and prompt for message text
                     self.bot.answer_callback_query(cq_id)
-                    self.bot.send_message(chat_id, "Шаг 2: Введите сообщение, которое хотите отправить:")
+                    self.bot.send_message(chat_id, "Шаг 2: Введите сообщение, которое хотите отправить: 📩")
                     return
 
             # Generic command buttons (from main menu/help etc.)
@@ -326,7 +326,7 @@ class MessageHandlers:
             target_chat = text if text.lower() != 'me' else chat_id
             state['chat_id'] = target_chat
             state['step'] = 'message'
-            self.bot.send_message(chat_id, "Шаг 2: Введите сообщение, которое хотите отправить:")
+            self.bot.send_message(chat_id, "Шаг 2: Введите сообщение, которое хотите отправить: 📩")
         
         elif step == 'message':
             state['message'] = text
@@ -489,13 +489,34 @@ class MessageHandlers:
                 del user_states[user_id]
             
         except Exception as e:
-            error_message = f"❌ Ошибка при создании расписания: {e}\n\nПожалуйста, попробуйте снова с /schedule"
-            self.bot.send_message(chat_id, error_message)
+            # Preserve the target chat and message so user can re-enter schedule
             logger.error(f"Error creating schedule: {e}")
-            
-            # Очищаем состояние пользователя при ошибке
-            if user_id in user_states:
-                del user_states[user_id]
+            # Ensure state exists and points back to schedule step
+            user_states[user_id] = {
+                'step': 'schedule',
+                'chat_id': state.get('chat_id') if isinstance(state, dict) else None,
+                'message': state.get('message') if isinstance(state, dict) else None
+            }
+
+            # Prompt user to re-enter schedule (keep chat_id and message remembered)
+            error_text = (
+                f"❌ Ошибка при создании расписания: {e}\n\n"
+                "Пожалуйста, введите расписание ещё раз (пример: `daily 09:00`, `every 30 minutes`, или cron `0 9 * * MON`).\n"
+                "Если хотите начать заново — нажмите кнопку ниже."
+            )
+            retry_markup = {'inline_keyboard': [[
+                {'text': '🔁 Начать заново', 'callback_data': 'cmd:schedule'}
+            ]]}
+
+            # Try to send the richer message; if that fails, fall back to a simple send
+            try:
+                self.bot.send_message_with_markup(chat_id, error_text, reply_markup=retry_markup, parse_mode='Markdown')
+            except Exception as send_err:
+                logger.error(f"Failed to send error message with markup: {send_err}")
+                try:
+                    self.bot.send_message(chat_id, error_text)
+                except Exception as send_err2:
+                    logger.error(f"Failed to send fallback error message: {send_err2}")
     
     def delete_job(self, chat_id, user_id, job_id):
         """Удаление работы полностью"""
