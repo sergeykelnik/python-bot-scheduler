@@ -14,6 +14,7 @@ WARSAW_TZ = pytz.timezone('Europe/Warsaw')
 # маркер чтобы основной модуль (`bot.py`) мог проверить и показать
 # понятное сообщение пользователю instead of raising at import time.
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or 'YOUR_BOT_TOKEN_HERE'
+GROQ_TOKEN = os.getenv('GROQ_API_KEY')
 
 # Настройки базы данных
 DB_PATH = 'schedules.db'

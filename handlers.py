@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+from schedule_manager import ScheduleManager
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +12,8 @@ user_states = {}
 class MessageHandlers:
     def __init__(self, bot_instance):
         self.bot = bot_instance
+        # AI-based schedule parser (fallback)
+        self.schedule_manager = ScheduleManager()
     
     def handle_start(self, chat_id, user_id):
         """Обработка команды /start"""
@@ -105,7 +108,7 @@ class MessageHandlers:
             text += f"Статус: {status}\n"
             text += f"Цель: {job_info['chat_id']}\n"
             text += f"Сообщение: {job_info['message'][:50]}...\n"
-            text += f"Расписание: {job_info['schedule']}\n"
+            text += f"Расписание: `{job_info['schedule']}`\n"
             text += f"─────────────\n"
         
         text += "\nИспользуйте /manage для управления расписаниями"
@@ -128,12 +131,6 @@ class MessageHandlers:
             # send a separate message per job with inline buttons
             self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
-    def handle_manage_selection(self, chat_id, user_id, selection):
-        """(Устаревший) выбор работы больше не используется."""
-    
-    def handle_manage_action(self, chat_id, user_id, action):
-        """(Устаревший) действие управления через ввод номера не поддерживается."""
-    
     def handle_getchatid(self, chat_id, user_id):
         """Обработка команды /getchatid"""
         self.bot.send_message(chat_id, f"ID этого чата: `{chat_id}`")
@@ -146,7 +143,7 @@ class MessageHandlers:
             f"*Статус:* {status}\n"
             f"*Цель:* {job_info.get('chat_id')}\n"
             f"*Сообщение:* {job_info.get('message')}\n"
-            f"*Расписание:* {job_info.get('schedule')}\n"
+            f"*Расписание:* `{job_info.get('schedule')}`\n"
         )
         return text
 
@@ -368,62 +365,86 @@ class MessageHandlers:
             schedule_text_lower = schedule_text.lower()
 
             if schedule_text_lower.startswith('daily'):
-                parts = schedule_text.split()
-                if len(parts) < 2:
-                    raise ValueError("Формат: daily HH:MM (например: daily 09:00)")
-                time_str = parts[1]
+                try:
+                    parts = schedule_text.split()
+                    if len(parts) < 2:
+                        raise ValueError("Формат: daily HH:MM (например: daily 09:00)")
+                    time_str = parts[1]
 
-                # Проверка формата времени
-                if ':' not in time_str:
-                    raise ValueError("Неверный формат времени. Используйте HH:MM")
+                    # Проверка формата времени
+                    if ':' not in time_str:
+                        raise ValueError("Неверный формат времени. Используйте HH:MM")
 
-                hour, minute = map(int, time_str.split(':'))
+                    hour, minute = map(int, time_str.split(':'))
 
-                # Проверка валидности времени
-                if not (0 <= hour <= 23) or not (0 <= minute <= 59):
-                    raise ValueError("Неверное время. Часы должны быть от 0 до 23, минуты от 0 до 59")
+                    # Проверка валидности времени
+                    if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+                        raise ValueError("Неверное время. Часы должны быть от 0 до 23, минуты от 0 до 59")
 
-                schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
-                schedule_type = 'daily'
+                    schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
+                    schedule_type = 'daily'
+                except ValueError:
+                    # Fallback to AI parser when manual parsing fails
+                    try:
+                        cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
+                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
+                        schedule_type = 'cron'
+                    except Exception as ai_err:
+                        raise ValueError(f"Невозможно распознать расписание: {ai_err}")
 
             # Парсинг интервального расписания
             elif schedule_text_lower.startswith('every'):
-                parts = schedule_text.split()
-                if len(parts) < 3:
-                    raise ValueError("Формат: every X hours/minutes/seconds (например: every 10 seconds)")
-
                 try:
-                    interval = int(parts[1])
+                    parts = schedule_text.split()
+                    if len(parts) < 3:
+                        raise ValueError("Формат: every X hours/minutes/seconds (например: every 10 seconds)")
+
+                    try:
+                        interval = int(parts[1])
+                    except ValueError:
+                        raise ValueError("Интервал должен быть числом (например: every 10 seconds)")
+
+                    if interval <= 0:
+                        raise ValueError("Интервал должен быть положительным числом")
+
+                    unit = parts[2].lower()
+
+                    # Нормализация единицы измерения
+                    if unit.startswith('hour'):
+                        schedule_unit = 'hours'
+                    elif unit.startswith('minute'):
+                        schedule_unit = 'minutes'
+                    elif unit.startswith('second'):
+                        schedule_unit = 'seconds'
+                    else:
+                        raise ValueError("Единица измерения должна быть: hours, minutes или seconds")
+
+                    schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, schedule_unit)
+                    schedule_type = 'interval'
                 except ValueError:
-                    raise ValueError("Интервал должен быть числом (например: every 10 seconds)")
-
-                if interval <= 0:
-                    raise ValueError("Интервал должен быть положительным числом")
-
-                unit = parts[2].lower()
-
-                # Нормализация единицы измерения
-                if unit.startswith('hour'):
-                    schedule_unit = 'hours'
-                elif unit.startswith('minute'):
-                    schedule_unit = 'minutes'
-                elif unit.startswith('second'):
-                    schedule_unit = 'seconds'
-                else:
-                    raise ValueError("Единица измерения должна быть: hours, minutes или seconds")
-
-                schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, schedule_unit)
-                schedule_type = 'interval'
+                    # Fallback to AI parser when manual parsing fails
+                    try:
+                        cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
+                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
+                        schedule_type = 'cron'
+                    except Exception as ai_err:
+                        raise ValueError(f"Невозможно распознать расписание: {ai_err}")
 
             # Парсинг cron выражения
             else:
                 # Базовая проверка cron выражения
                 cron_parts = schedule_text.split()
                 if len(cron_parts) != 5:
-                    raise ValueError("Cron выражение должно содержать 5 частей (например: 0 9 * * MON)")
-
-                schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
-                schedule_type = 'cron'
+                    # Try AI parser to convert natural language to cron
+                    try:
+                        cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
+                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
+                        schedule_type = 'cron'
+                    except Exception as ai_err:
+                        raise ValueError(f"Cron выражение должно содержать 5 частей (например: 0 9 * * MON). AI fallback failed: {ai_err}")
+                else:
+                    schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
+                    schedule_type = 'cron'
             
             # Сохраняем информацию о работе в памяти
             self.bot.scheduler.scheduled_jobs[job_id] = {
@@ -449,7 +470,7 @@ class MessageHandlers:
             success_text = (
                 f"✅ *Расписание успешно создано!*\n\n"
                 f"ID: `{job_id}`\n"
-                f"Расписание: {schedule_data['description']}\n"
+                f"Расписание: `{schedule_data['description']}`\n"
                 f"Цель: {state['chat_id']}\n"
             )
             success_markup = {'inline_keyboard': [
@@ -463,8 +484,9 @@ class MessageHandlers:
             ]}
             self.bot.send_message_with_markup(chat_id, success_text, reply_markup=success_markup, parse_mode='Markdown')
             
-            # Очищаем состояние пользователя
-            del user_states[user_id]
+            # Очищаем состояние пользователя (только если есть)
+            if user_id in user_states:
+                del user_states[user_id]
             
         except Exception as e:
             error_message = f"❌ Ошибка при создании расписания: {e}\n\nПожалуйста, попробуйте снова с /schedule"
