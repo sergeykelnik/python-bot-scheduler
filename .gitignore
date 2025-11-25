@@ -4,3 +4,4 @@ __pycache__/
 *.schedules.db
 *.env
 *.idea
+.coverage
