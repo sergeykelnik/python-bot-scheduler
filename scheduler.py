@@ -14,9 +14,38 @@ class SchedulerManager:
         self.scheduler = BackgroundScheduler(timezone=WARSAW_TZ)
         self.scheduled_jobs = {}
     
+    def _add_job_to_scheduler(self, job_id, schedule_type, schedule_data, chat_id, message):
+        """Helper to add different types of jobs to the scheduler."""
+        if schedule_type == 'daily':
+            trigger = CronTrigger(
+                hour=schedule_data['hour'],
+                minute=schedule_data['minute'],
+                timezone=WARSAW_TZ
+            )
+        elif schedule_type == 'interval':
+            if schedule_data['unit'] == 'hours':
+                trigger = IntervalTrigger(hours=schedule_data['interval'], timezone=WARSAW_TZ)
+            elif schedule_data['unit'] == 'minutes':
+                trigger = IntervalTrigger(minutes=schedule_data['interval'], timezone=WARSAW_TZ)
+            elif schedule_data['unit'] == 'seconds':
+                trigger = IntervalTrigger(seconds=schedule_data['interval'], timezone=WARSAW_TZ)
+            else:
+                raise ValueError(f"Unknown interval unit: {schedule_data['unit']}")
+        elif schedule_type == 'cron':
+            trigger = CronTrigger.from_crontab(schedule_data['expression'], timezone=WARSAW_TZ)
+        else:
+            raise ValueError(f"Unknown schedule type: {schedule_type}")
+
+        self.scheduler.add_job(
+            self.bot.send_scheduled_message,
+            trigger,
+            args=[chat_id, message],
+            id=job_id
+        )
+    
     def load_schedules_from_db(self):
         """Загрузка всех расписаний из базы данных и их восстановление"""
-        schedules = self.bot.db.get_all_schedules()
+        schedules = self.bot.db.get_schedules()
         logger.info(f"Loading {len(schedules)} schedules from database")
         
         for schedule in schedules:
@@ -27,40 +56,13 @@ class SchedulerManager:
             try:
                 # Добавляем в планировщик только если не на паузе
                 if not schedule['is_paused']:
-                    if schedule_type == 'daily':
-                        self.scheduler.add_job(
-                            self.bot.send_scheduled_message,
-                            CronTrigger(
-                                hour=schedule_data['hour'],
-                                minute=schedule_data['minute'],
-                                timezone=WARSAW_TZ
-                            ),
-                            args=[schedule['chat_id'], schedule['message']],
-                            id=job_id
-                        )
-                    
-                    elif schedule_type == 'interval':
-                        if schedule_data['unit'] == 'hours':
-                            trigger = IntervalTrigger(hours=schedule_data['interval'], timezone=WARSAW_TZ)
-                        elif schedule_data['unit'] == 'minutes':
-                            trigger = IntervalTrigger(minutes=schedule_data['interval'], timezone=WARSAW_TZ)
-                        elif schedule_data['unit'] == 'seconds':
-                            trigger = IntervalTrigger(seconds=schedule_data['interval'], timezone=WARSAW_TZ)
-                        
-                        self.scheduler.add_job(
-                            self.bot.send_scheduled_message,
-                            trigger,
-                            args=[schedule['chat_id'], schedule['message']],
-                            id=job_id
-                        )
-                    
-                    elif schedule_type == 'cron':
-                        self.scheduler.add_job(
-                            self.bot.send_scheduled_message,
-                            CronTrigger.from_crontab(schedule_data['expression'], timezone=WARSAW_TZ),
-                            args=[schedule['chat_id'], schedule['message']],
-                            id=job_id
-                        )
+                    self._add_job_to_scheduler(
+                        job_id,
+                        schedule_type,
+                        schedule_data,
+                        schedule['chat_id'],
+                        schedule['message']
+                    )
                 
                 # Сохраняем в памяти независимо от статуса паузы
                 self.scheduled_jobs[job_id] = {
@@ -79,13 +81,9 @@ class SchedulerManager:
     def create_daily_schedule(self, job_id, chat_id, message, hour, minute):
         """Создание ежедневного расписания"""
         try:
-            self.scheduler.add_job(
-                self.bot.send_scheduled_message,
-                CronTrigger(hour=hour, minute=minute, timezone=WARSAW_TZ),
-                args=[chat_id, message],
-                id=job_id
-            )
-            return {'hour': hour, 'minute': minute, 'description': f"Ежедневно в {hour:02d}:{minute:02d} (Europe/Warsaw)"}
+            schedule_data = {'hour': hour, 'minute': minute, 'description': f"Ежедневно в {hour:02d}:{minute:02d} (Europe/Warsaw)"}
+            self._add_job_to_scheduler(job_id, 'daily', schedule_data, chat_id, message)
+            return schedule_data
         except Exception as e:
             logger.error(f"Error creating daily schedule: {e}")
             raise
@@ -94,25 +92,17 @@ class SchedulerManager:
         """Создание интервального расписания"""
         try:
             if unit == 'hours':
-                trigger = IntervalTrigger(hours=interval, timezone=WARSAW_TZ)
                 unit_desc = 'час(ов)'
-                schedule_unit = 'hours'
             elif unit == 'minutes':
-                trigger = IntervalTrigger(minutes=interval, timezone=WARSAW_TZ)
                 unit_desc = 'минут(ы)'
-                schedule_unit = 'minutes'
             elif unit == 'seconds':
-                trigger = IntervalTrigger(seconds=interval, timezone=WARSAW_TZ)
                 unit_desc = 'секунд(ы)'
-                schedule_unit = 'seconds'
+            else:
+                raise ValueError(f"Unknown interval unit: {unit}")
             
-            self.scheduler.add_job(
-                self.bot.send_scheduled_message,
-                trigger,
-                args=[chat_id, message],
-                id=job_id
-            )
-            return {'interval': interval, 'unit': schedule_unit, 'description': f"Каждые {interval} {unit_desc} (Europe/Warsaw)"}
+            schedule_data = {'interval': interval, 'unit': unit, 'description': f"Каждые {interval} {unit_desc} (Europe/Warsaw)"}
+            self._add_job_to_scheduler(job_id, 'interval', schedule_data, chat_id, message)
+            return schedule_data
         except Exception as e:
             logger.error(f"Error creating interval schedule: {e}")
             raise
@@ -120,13 +110,9 @@ class SchedulerManager:
     def create_cron_schedule(self, job_id, chat_id, message, cron_expression):
         """Создание cron расписания"""
         try:
-            self.scheduler.add_job(
-                self.bot.send_scheduled_message,
-                CronTrigger.from_crontab(cron_expression, timezone=WARSAW_TZ),
-                args=[chat_id, message],
-                id=job_id
-            )
-            return {'expression': cron_expression, 'description': f"Cron: {cron_expression} (Europe/Warsaw)"}
+            schedule_data = {'expression': cron_expression, 'description': f"Cron: {cron_expression} (Europe/Warsaw)"}
+            self._add_job_to_scheduler(job_id, 'cron', schedule_data, chat_id, message)
+            return schedule_data
         except Exception as e:
             logger.error(f"Error creating cron schedule: {e}")
             raise
@@ -145,12 +131,7 @@ class SchedulerManager:
     def resume_job(self, job_id, schedule_type, schedule_data, chat_id, message):
         """Возобновление работы"""
         try:
-            if schedule_type == 'daily':
-                self.create_daily_schedule(job_id, chat_id, message, schedule_data['hour'], schedule_data['minute'])
-            elif schedule_type == 'interval':
-                self.create_interval_schedule(job_id, chat_id, message, schedule_data['interval'], schedule_data['unit'])
-            elif schedule_type == 'cron':
-                self.create_cron_schedule(job_id, chat_id, message, schedule_data['expression'])
+            self._add_job_to_scheduler(job_id, schedule_type, schedule_data, chat_id, message)
             
             logger.info(f"Job {job_id} resumed successfully")
             return True

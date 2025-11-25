@@ -53,6 +53,14 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"❌ Ошибка при настройке меню команд: {e}")
     
+    def _post_json(self, url, data):
+        try:
+            response = requests.post(url, json=data)
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error sending request to {url}: {e}")
+            return None
+
     def send_message(self, chat_id, text, parse_mode: str = 'Markdown', reply_markup: dict = None):
         """Отправка сообщения в чат.
 
@@ -75,26 +83,6 @@ class TelegramBot:
         """Отправка запланированного сообщения"""
         logger.info(f"Sending scheduled message to {chat_id}")
         self.send_message(chat_id, message)
-
-    def _post_json(self, url, data):
-        try:
-            response = requests.post(url, json=data)
-            return response.json()
-        except Exception as e:
-            logger.error(f"Error sending request to {url}: {e}")
-            return None
-
-    def send_message_with_markup(self, chat_id, text, reply_markup=None, parse_mode='Markdown'):
-        """Send message with optional inline keyboard (reply_markup as dict)."""
-        url = f"{self.base_url}/sendMessage"
-        data = {
-            'chat_id': chat_id,
-            'text': text,
-            'parse_mode': parse_mode
-        }
-        if reply_markup is not None:
-            data['reply_markup'] = reply_markup
-        return self._post_json(url, data)
 
     def answer_callback_query(self, callback_query_id, text=None, show_alert=False):
         """Answer a callback query to acknowledge the button press."""

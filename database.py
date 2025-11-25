@@ -32,72 +32,56 @@ class Database:
             conn.commit()
         logger.info("Database initialized")
     
-    def save_schedule(self, job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused=False):
-        """Сохранение расписания в базу данных"""
+    def _execute_query(self, query, params=None, fetch_all=False, fetch_one=False):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR REPLACE INTO schedules 
-                (job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (job_id, user_id, chat_id, message, schedule_type, json.dumps(schedule_data), 1 if is_paused else 0))
+            cursor.execute(query, params or ())
             conn.commit()
+            if fetch_all:
+                return cursor.fetchall()
+            if fetch_one:
+                return cursor.fetchone()
+            return None
+    def save_schedule(self, job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused=False):
+        """Сохранение расписания в базу данных"""
+        self._execute_query('''
+            INSERT OR REPLACE INTO schedules 
+            (job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (job_id, user_id, chat_id, message, schedule_type, json.dumps(schedule_data), 1 if is_paused else 0))
         logger.info(f"Schedule saved to database: {job_id}")
     
     def delete_schedule(self, job_id):
         """Удаление расписания из базы данных"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM schedules WHERE job_id = ?', (job_id,))
-            conn.commit()
+        self._execute_query('DELETE FROM schedules WHERE job_id = ?', (job_id,))
         logger.info(f"Schedule deleted from database: {job_id}")
     
     def update_schedule_pause_status(self, job_id, is_paused):
         """Обновление статуса паузы расписания"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE schedules SET is_paused = ? WHERE job_id = ?
-            ''', (1 if is_paused else 0, job_id))
-            conn.commit()
+        self._execute_query('''
+            UPDATE schedules SET is_paused = ? WHERE job_id = ?
+        ''', (1 if is_paused else 0, job_id))
         logger.info(f"Schedule {job_id} pause status updated to: {is_paused}")
     
-    def get_all_schedules(self):
-        """Получение всех расписаний из базы данных"""
-        schedules = []
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM schedules')
-            rows = cursor.fetchall()
-            for row in rows:
-                schedules.append({
-                    'job_id': row[0],
-                    'user_id': row[1],
-                    'chat_id': row[2],
-                    'message': row[3],
-                    'schedule_type': row[4],
-                    'schedule_data': json.loads(row[5]),
-                    'is_paused': bool(row[6]),
-                    'created_at': row[7]
-                })
-        return schedules
+
     
-    def get_user_schedules(self, user_id):
-        """Получение всех расписаний для конкретного пользователя"""
+    def get_schedules(self, user_id=None):
+        """Получение всех расписаний из базы данных или для конкретного пользователя"""
         schedules = []
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM schedules WHERE user_id = ?', (user_id,))
-            rows = cursor.fetchall()
-            for row in rows:
-                schedules.append({
-                    'job_id': row[0],
-                    'user_id': row[1],
-                    'chat_id': row[2],
-                    'message': row[3],
-                    'schedule_type': row[4],
-                    'schedule_data': json.loads(row[5]),
-                    'is_paused': bool(row[6]),
-                    'created_at': row[7]
-                })
+        if user_id:
+            rows = self._execute_query('SELECT * FROM schedules WHERE user_id = ?', (user_id,), fetch_all=True)
+        else:
+            rows = self._execute_query('SELECT * FROM schedules', fetch_all=True)
+            
+        for row in rows:
+            schedules.append({
+                'job_id': row[0],
+                'user_id': row[1],
+                'chat_id': row[2],
+                'message': row[3],
+                'schedule_type': row[4],
+                'schedule_data': json.loads(row[5]),
+                'is_paused': bool(row[6]),
+                'created_at': row[7]
+            })
         return schedules

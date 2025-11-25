@@ -36,7 +36,7 @@ class MessageHandlers:
                 ]
             ]
         }
-        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+        self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_help(self, chat_id, user_id):
         """Обработка команды /help"""
@@ -75,7 +75,7 @@ class MessageHandlers:
             {'text': '📋 Мои расписания', 'callback_data': 'cmd:list'},
             {'text': '⚙️ Управление', 'callback_data': 'cmd:manage'}
         ]]}
-        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+        self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_schedule(self, chat_id, user_id):
         """Обработка команды /schedule"""
@@ -90,7 +90,7 @@ class MessageHandlers:
             {'text': '🆔 Получить ID чата', 'callback_data': 'cmd:getchatid'},
             {'text': '👤 Мне (me)', 'callback_data': 'schedule:me'}
         ]]}
-        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+        self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_list(self, chat_id, user_id):
         """Обработка команды /list"""
@@ -114,7 +114,7 @@ class MessageHandlers:
         text += "\nИспользуйте /manage для управления расписаниями"
         # Добавим кнопку управления после списка
         markup = {'inline_keyboard': [[{'text': '⚙️ Управление', 'callback_data': 'cmd:manage'}]]}
-        self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+        self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_manage(self, chat_id, user_id):
         """Обработка команды /manage - показать интерактивный список"""
@@ -129,7 +129,7 @@ class MessageHandlers:
             text = self._build_job_text(job_id, job_info)
             markup = self._build_job_markup(job_id, job_info)
             # send a separate message per job with inline buttons
-            self.bot.send_message_with_markup(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+            self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
     def handle_getchatid(self, chat_id, user_id):
         """Обработка команды /getchatid"""
@@ -162,6 +162,16 @@ class MessageHandlers:
 
         # Inline keyboard uses rows; put two buttons on one row
         return {'inline_keyboard': [buttons]}
+
+    def _check_job_permission(self, job_id, user_id, cq_id):
+        job = self.bot.scheduler.scheduled_jobs.get(job_id)
+        if not job:
+            self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
+            return None
+        if job.get('user_id') != user_id:
+            self.bot.answer_callback_query(cq_id, text='У вас нет прав для этого действия', show_alert=True)
+            return None
+        return job
 
     def handle_callback_query(self, cq, cq_id, from_user, chat_id, message_id, data):
         """Обработка callback_query от inline-кнопок управления.
@@ -216,13 +226,8 @@ class MessageHandlers:
             if action == 'manage' and len(parts) == 3:
                 subaction, job_id = parts[1], parts[2]
 
-                # Permission check
-                job = self.bot.scheduler.scheduled_jobs.get(job_id)
-                if not job:
-                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
-                    return
-                if job.get('user_id') != from_user:
-                    self.bot.answer_callback_query(cq_id, text='У вас нет прав для этого действия', show_alert=True)
+                job = self._check_job_permission(job_id, from_user, cq_id)
+                if job is None:
                     return
 
                 if subaction == 'pause':
@@ -239,7 +244,7 @@ class MessageHandlers:
 
                 elif subaction == 'resume':
                     # Load schedule data from DB
-                    schedules = self.bot.db.get_user_schedules(from_user)
+                    schedules = self.bot.db.get_schedules(user_id=from_user)
                     target = None
                     for s in schedules:
                         if s['job_id'] == job_id:
@@ -273,12 +278,8 @@ class MessageHandlers:
 
             elif action == 'confirm_delete' and len(parts) == 2:
                 job_id = parts[1]
-                job = self.bot.scheduler.scheduled_jobs.get(job_id)
-                if not job:
-                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
-                    return
-                if job.get('user_id') != from_user:
-                    self.bot.answer_callback_query(cq_id, text='У вас нет прав для этого действия', show_alert=True)
+                job = self._check_job_permission(job_id, from_user, cq_id)
+                if job is None:
                     return
 
                 # Proceed to delete
@@ -293,9 +294,8 @@ class MessageHandlers:
 
             elif action == 'cancel_delete' and len(parts) == 2:
                 job_id = parts[1]
-                job = self.bot.scheduler.scheduled_jobs.get(job_id)
-                if not job:
-                    self.bot.answer_callback_query(cq_id, text='Расписание не найдено', show_alert=True)
+                job = self._check_job_permission(job_id, from_user, cq_id)
+                if job is None:
                     return
                 # restore original message and buttons
                 orig_text = self._build_job_text(job_id, job)
@@ -351,6 +351,46 @@ class MessageHandlers:
         elif step == 'manage_action':
             self.handle_manage_action(chat_id, user_id, text)
     
+    def _parse_daily_schedule(self, schedule_text):
+        """Helper to parse 'daily HH:MM' schedule."""
+        parts = schedule_text.split()
+        if len(parts) < 2:
+            raise ValueError("Формат: daily HH:MM (например: daily 09:00)")
+        time_str = parts[1]
+
+        if ':' not in time_str:
+            raise ValueError("Неверный формат времени. Используйте HH:MM")
+
+        hour, minute = map(int, time_str.split(':'))
+        if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+            raise ValueError("Неверное время. Часы должны быть от 0 до 23, минуты от 0 до 59")
+        return hour, minute
+
+    def _parse_interval_schedule(self, schedule_text):
+        """Helper to parse 'every X hours/minutes/seconds' schedule."""
+        parts = schedule_text.split()
+        if len(parts) < 3:
+            raise ValueError("Формат: every X hours/minutes/seconds (например: every 10 seconds)")
+
+        try:
+            interval = int(parts[1])
+        except ValueError:
+            raise ValueError("Интервал должен быть числом (например: every 10 seconds)")
+
+        if interval <= 0:
+            raise ValueError("Интервал должен быть положительным числом")
+
+        unit = parts[2].lower()
+        if unit.startswith('hour'):
+            schedule_unit = 'hours'
+        elif unit.startswith('minute'):
+            schedule_unit = 'minutes'
+        elif unit.startswith('second'):
+            schedule_unit = 'seconds'
+        else:
+            raise ValueError("Единица измерения должна быть: hours, minutes или seconds")
+        return interval, schedule_unit
+
     def create_schedule(self, chat_id, user_id, schedule_text, state):
         """Создание нового расписания"""
         job_id = f"job_{user_id}_{int(datetime.now().timestamp())}"
@@ -360,91 +400,31 @@ class MessageHandlers:
             schedule_data = {}
             schedule_type = ""
             
-            # Парсинг ежедневного расписания
-            schedule_text = schedule_text.strip()
             schedule_text_lower = schedule_text.lower()
 
             if schedule_text_lower.startswith('daily'):
-                try:
-                    parts = schedule_text.split()
-                    if len(parts) < 2:
-                        raise ValueError("Формат: daily HH:MM (например: daily 09:00)")
-                    time_str = parts[1]
-
-                    # Проверка формата времени
-                    if ':' not in time_str:
-                        raise ValueError("Неверный формат времени. Используйте HH:MM")
-
-                    hour, minute = map(int, time_str.split(':'))
-
-                    # Проверка валидности времени
-                    if not (0 <= hour <= 23) or not (0 <= minute <= 59):
-                        raise ValueError("Неверное время. Часы должны быть от 0 до 23, минуты от 0 до 59")
-
-                    schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
-                    schedule_type = 'daily'
-                except ValueError:
-                    # Fallback to AI parser when manual parsing fails
-                    try:
-                        cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
-                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
-                        schedule_type = 'cron'
-                    except Exception as ai_err:
-                        raise ValueError(f"Невозможно распознать расписание: {ai_err}")
-
-            # Парсинг интервального расписания
+                hour, minute = self._parse_daily_schedule(schedule_text)
+                schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
+                schedule_type = 'daily'
             elif schedule_text_lower.startswith('every'):
-                try:
-                    parts = schedule_text.split()
-                    if len(parts) < 3:
-                        raise ValueError("Формат: every X hours/minutes/seconds (например: every 10 seconds)")
-
-                    try:
-                        interval = int(parts[1])
-                    except ValueError:
-                        raise ValueError("Интервал должен быть числом (например: every 10 seconds)")
-
-                    if interval <= 0:
-                        raise ValueError("Интервал должен быть положительным числом")
-
-                    unit = parts[2].lower()
-
-                    # Нормализация единицы измерения
-                    if unit.startswith('hour'):
-                        schedule_unit = 'hours'
-                    elif unit.startswith('minute'):
-                        schedule_unit = 'minutes'
-                    elif unit.startswith('second'):
-                        schedule_unit = 'seconds'
-                    else:
-                        raise ValueError("Единица измерения должна быть: hours, minutes или seconds")
-
-                    schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, schedule_unit)
-                    schedule_type = 'interval'
-                except ValueError:
-                    # Fallback to AI parser when manual parsing fails
-                    try:
-                        cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
-                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
-                        schedule_type = 'cron'
-                    except Exception as ai_err:
-                        raise ValueError(f"Невозможно распознать расписание: {ai_err}")
-
-            # Парсинг cron выражения
+                interval, unit = self._parse_interval_schedule(schedule_text)
+                schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, unit)
+                schedule_type = 'interval'
             else:
-                # Базовая проверка cron выражения
-                cron_parts = schedule_text.split()
-                if len(cron_parts) != 5:
-                    # Try AI parser to convert natural language to cron
-                    try:
+                # Attempt to parse as cron directly, or fallback to AI
+                try:
+                    # Basic cron validation (5 parts)
+                    cron_parts = schedule_text.split()
+                    if len(cron_parts) == 5:
+                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
+                        schedule_type = 'cron'
+                    else:
+                        # Fallback to AI parser for natural language or malformed cron
                         cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
                         schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
                         schedule_type = 'cron'
-                    except Exception as ai_err:
-                        raise ValueError(f"Cron выражение должно содержать 5 частей (например: 0 9 * * MON). AI fallback failed: {ai_err}")
-                else:
-                    schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
-                    schedule_type = 'cron'
+                except Exception as e:
+                    raise ValueError(f"Невозможно распознать расписание: {e}")
             
             # Сохраняем информацию о работе в памяти
             self.bot.scheduler.scheduled_jobs[job_id] = {
@@ -482,7 +462,7 @@ class MessageHandlers:
                     {'text': '🗑️ Отменить это расписание', 'callback_data': f'manage:delete:{job_id}'}
                 ]
             ]}
-            self.bot.send_message_with_markup(chat_id, success_text, reply_markup=success_markup, parse_mode='Markdown')
+            self.bot.send_message(chat_id, success_text, reply_markup=success_markup, parse_mode='Markdown')
             
             # Очищаем состояние пользователя (только если есть)
             if user_id in user_states:
@@ -510,7 +490,7 @@ class MessageHandlers:
 
             # Try to send the richer message; if that fails, fall back to a simple send
             try:
-                self.bot.send_message_with_markup(chat_id, error_text, reply_markup=retry_markup, parse_mode='Markdown')
+                self.bot.send_message(chat_id, error_text, reply_markup=retry_markup, parse_mode='Markdown')
             except Exception as send_err:
                 logger.error(f"Failed to send error message with markup: {send_err}")
                 try:
@@ -518,83 +498,3 @@ class MessageHandlers:
                 except Exception as send_err2:
                     logger.error(f"Failed to send fallback error message: {send_err2}")
     
-    def delete_job(self, chat_id, user_id, job_id):
-        """Удаление работы полностью"""
-        try:
-            if job_id in self.bot.scheduler.scheduled_jobs and self.bot.scheduler.scheduled_jobs[job_id]['user_id'] == user_id:
-                # Удаляем из планировщика
-                self.bot.scheduler.delete_job(job_id)
-                
-                # Удаляем из базы данных
-                self.bot.db.delete_schedule(job_id)
-                
-                # Удаляем из памяти
-                del self.bot.scheduler.scheduled_jobs[job_id]
-                
-                self.bot.send_message(chat_id, f"✅ Расписание `{job_id}` успешно удалено!")
-            else:
-                self.bot.send_message(chat_id, "❌ Расписание не найдено или у вас нет прав.")
-        except Exception as e:
-            self.bot.send_message(chat_id, f"❌ Ошибка при удалении расписания: {e}")
-    
-    def toggle_job_pause(self, chat_id, user_id, job_id):
-        """Приостановка или возобновление работы"""
-        try:
-            if job_id in self.bot.scheduler.scheduled_jobs and self.bot.scheduler.scheduled_jobs[job_id]['user_id'] == user_id:
-                job_info = self.bot.scheduler.scheduled_jobs[job_id]
-                is_paused = job_info['is_paused']
-                
-                if is_paused:
-                    # Возобновляем работу - воссоздаем в планировщике
-                    db_schedule = self.bot.db.get_user_schedules(user_id)
-                    if not db_schedule:
-                        self.bot.send_message(chat_id, "❌ Ошибка: у вас нет расписаний в базе данных.")
-                        return
-                    
-                    # Ищем конкретное расписание
-                    target_schedule = None
-                    for schedule in db_schedule:
-                        if schedule['job_id'] == job_id:
-                            target_schedule = schedule
-                            break
-                    
-                    if not target_schedule:
-                        self.bot.send_message(chat_id, "❌ Ошибка: расписание не найдено в базе данных.")
-                        return
-                    
-                    # Восстанавливаем работу в планировщике
-                    success = self.bot.scheduler.resume_job(
-                        job_id, 
-                        target_schedule['schedule_type'], 
-                        target_schedule['schedule_data'],
-                        job_info['chat_id'],
-                        job_info['message']
-                    )
-                    
-                    if success:
-                        # Обновляем в памяти и базе данных
-                        self.bot.scheduler.scheduled_jobs[job_id]['is_paused'] = False
-                        self.bot.db.update_schedule_pause_status(job_id, False)
-                        
-                        self.bot.send_message(chat_id, f"▶️ Расписание `{job_id}` возобновлено!")
-                    else:
-                        self.bot.send_message(chat_id, f"❌ Ошибка при возобновлении расписания `{job_id}`")
-                
-                else:
-                    # Приостанавливаем работу - удаляем из планировщика но оставляем в памяти и базе данных
-                    success = self.bot.scheduler.pause_job(job_id)
-                    
-                    if success:
-                        # Обновляем в памяти и базе данных
-                        self.bot.scheduler.scheduled_jobs[job_id]['is_paused'] = True
-                        self.bot.db.update_schedule_pause_status(job_id, True)
-                        
-                        self.bot.send_message(chat_id, f"⏸️ Расписание `{job_id}` приостановлено!")
-                    else:
-                        self.bot.send_message(chat_id, f"❌ Ошибка при приостановке расписания `{job_id}`")
-            else:
-                self.bot.send_message(chat_id, "❌ Расписание не найдено или у вас нет прав.")
-        except Exception as e:
-            error_msg = f"❌ Ошибка при изменении статуса расписания: {e}"
-            self.bot.send_message(chat_id, error_msg)
-            logger.error(f"Error toggling job pause: {e}")
