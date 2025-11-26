@@ -10,7 +10,7 @@ All tests use mocks to isolate components and avoid external dependencies.
 Tests for the main TelegramBot class:
 - Bot initialization and setup
 - Message sending (with and without markup)
-- Command processing (/start, /help, /schedule, /list, /manage, /getchatid)
+- Command processing (/start, /help, /schedule, /list, /manage)
 - Callback query handling from inline buttons
 - Update processing (messages, callback queries, various edge cases)
 - Bot menu commands setup
@@ -34,7 +34,7 @@ Key features:
 
 ### test_handlers.py
 Tests for the MessageHandlers class:
-- Command handlers (/start, /help, /schedule, /list, /manage, /getchatid)
+- Command handlers (/start, /help, /schedule, /list, /manage)
 - Text message processing with state machine
 - Callback query handling (pause, resume, delete, confirm)
 - Schedule parsing (daily, interval, cron)

@@ -67,7 +67,7 @@ start htmlcov/index.html
 ### Bot Class (test_bot.py)
 - ✅ Initialization and setup
 - ✅ Message sending (with/without markup)
-- ✅ All command processing (/start, /help, /schedule, /list, /manage, /getchatid)
+- ✅ All command processing (/start, /help, /schedule, /list, /manage)
 - ✅ Callback query handling
 - ✅ Update routing and processing
 - ✅ Error handling

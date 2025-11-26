@@ -28,7 +28,7 @@ Execution time: ~11 seconds
 Tests for the main TelegramBot class:
 - Bot initialization
 - Message sending (with/without markup)
-- Command processing (/start, /help, /schedule, /list, /manage, /getchatid)
+- Command processing (/start, /help, /schedule, /list, /manage)
 - Callback query handling
 - Update processing and routing
 - Error handling
@@ -54,7 +54,7 @@ Tests for the Database class:
 
 ### 3. **test_handlers.py** (34 tests)
 Tests for the MessageHandlers class:
-- Command handlers (/start, /help, /schedule, /list, /manage, /getchatid)
+- Command handlers (/start, /help, /schedule, /list, /manage)
 - State machine for schedule creation
 - Schedule parsing:
   - Daily: "daily HH:MM"

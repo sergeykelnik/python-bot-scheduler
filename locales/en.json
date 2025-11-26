@@ -40,7 +40,6 @@
   "msg_help_cmd_schedule": "/schedule - Start schedule creation wizard",
   "msg_help_cmd_list": "/list - Show all active schedules",
   "msg_help_cmd_manage": "/manage - Manage schedules",
-  "msg_help_cmd_getchatid": "/getchatid - Get current chat ID",
   "msg_help_cmd_help": "/help - Show this help",
   "msg_help_tip": "Tip: For complex cron expressions, use generators like http://www.cronmaker.com/.",
   "msg_schedule_title": "📝 Let's create a schedule!",
