@@ -30,53 +30,6 @@ def test_scheduler_manager_initialization(scheduler_manager, mock_bot):
     assert scheduler_manager.scheduler is not None
 
 
-def test_create_daily_schedule(scheduler_manager, mock_bot):
-    """Test creating a daily schedule"""
-    with patch.object(scheduler_manager, '_add_job_to_scheduler') as mock_add:
-        result = scheduler_manager.create_daily_schedule(
-            'job_1', '123', 'Test message', 9, 30
-        )
-    
-    assert result['hour'] == 9
-    assert result['minute'] == 30
-    assert 'description' in result
-    assert '09:30' in result['description']
-
-
-def test_create_interval_schedule_hours(scheduler_manager):
-    """Test creating an interval schedule with hours"""
-    with patch.object(scheduler_manager, '_add_job_to_scheduler'):
-        result = scheduler_manager.create_interval_schedule(
-            'job_1', '123', 'Message', 2, 'hours'
-        )
-    
-    assert result['interval'] == 2
-    assert result['unit'] == 'hours'
-    assert 'описание' in result['description'].lower() or 'description' in str(result)
-
-
-def test_create_interval_schedule_minutes(scheduler_manager):
-    """Test creating an interval schedule with minutes"""
-    with patch.object(scheduler_manager, '_add_job_to_scheduler'):
-        result = scheduler_manager.create_interval_schedule(
-            'job_1', '123', 'Message', 30, 'minutes'
-        )
-    
-    assert result['interval'] == 30
-    assert result['unit'] == 'minutes'
-
-
-def test_create_interval_schedule_seconds(scheduler_manager):
-    """Test creating an interval schedule with seconds"""
-    with patch.object(scheduler_manager, '_add_job_to_scheduler'):
-        result = scheduler_manager.create_interval_schedule(
-            'job_1', '123', 'Message', 10, 'seconds'
-        )
-    
-    assert result['interval'] == 10
-    assert result['unit'] == 'seconds'
-
-
 def test_create_cron_schedule(scheduler_manager):
     """Test creating a cron schedule"""
     with patch.object(scheduler_manager, '_add_job_to_scheduler'):
@@ -121,7 +74,7 @@ def test_resume_job(scheduler_manager):
     """Test resuming a job"""
     with patch.object(scheduler_manager, '_add_job_to_scheduler'):
         result = scheduler_manager.resume_job(
-            'job_1', {'hour': 9, 'minute': 0}, '123', 'Message'
+            'job_1', {'expression': '0 9 * * *'}, '123', 'Message'
         )
     
     assert result is True
@@ -131,7 +84,7 @@ def test_resume_job_error(scheduler_manager):
     """Test error handling when resuming a job"""
     with patch.object(scheduler_manager, '_add_job_to_scheduler', side_effect=Exception("Error")):
         result = scheduler_manager.resume_job(
-            'job_1', {'hour': 9, 'minute': 0}, '123', 'Message'
+            'job_1', {'expression': '0 9 * * *'}, '123', 'Message'
         )
     
     assert result is False
@@ -196,7 +149,7 @@ def test_load_schedules_from_db_single(scheduler_manager, mock_bot):
         'user_id': 123,
         'chat_id': '456',
         'message': 'Test message',
-        'schedule_data': {'hour': 9, 'minute': 0, 'description': 'Daily at 09:00'},
+        'schedule_data': {'expression': '0 9 * * *', 'description': 'Cron: 0 9 * * * (Europe/Warsaw)'},
         'is_paused': False
     }
     mock_bot.db.get_schedules = Mock(return_value=[schedule])
@@ -215,7 +168,7 @@ def test_load_schedules_from_db_paused_not_added(scheduler_manager, mock_bot):
         'user_id': 123,
         'chat_id': '456',
         'message': 'Test message',
-        'schedule_data': {'hour': 9, 'minute': 0, 'description': 'Daily at 09:00'},
+        'schedule_data': {'expression': '0 9 * * *', 'description': 'Cron: 0 9 * * * (Europe/Warsaw)'},
         'is_paused': True
     }
     mock_bot.db.get_schedules = Mock(return_value=[schedule])
@@ -238,7 +191,7 @@ def test_load_schedules_from_db_multiple(scheduler_manager, mock_bot):
             'user_id': 123 + i,
             'chat_id': f'{456 + i}',
             'message': f'Message {i}',
-            'schedule_data': {'hour': 9, 'minute': 0, 'description': f'Daily at 09:00'},
+            'schedule_data': {'expression': '0 9 * * *', 'description': f'Cron: 0 9 * * * (Europe/Warsaw)'},
             'is_paused': False
         }
         for i in range(3)
@@ -261,7 +214,7 @@ def test_load_schedules_from_db_with_error(scheduler_manager, mock_bot):
             'user_id': 123,
             'chat_id': '456',
             'message': 'Message 1',
-            'schedule_data': {'hour': 9, 'minute': 0},
+            'schedule_data': {'expression': '0 9 * * *', 'description': 'Cron: 0 9 * * * (Europe/Warsaw)'},
             'is_paused': False
         },
         {
@@ -269,7 +222,7 @@ def test_load_schedules_from_db_with_error(scheduler_manager, mock_bot):
             'user_id': 124,
             'chat_id': '457',
             'message': 'Message 2',
-            'schedule_data': {'hour': 10, 'minute': 0},
+            'schedule_data': {'expression': '0 10 * * *', 'description': 'Cron: 0 10 * * * (Europe/Warsaw)'},
             'is_paused': False
         }
     ]
@@ -282,116 +235,3 @@ def test_load_schedules_from_db_with_error(scheduler_manager, mock_bot):
     
     # Should have loaded job_2 even though job_1 failed
     assert 'job_2' in scheduler_manager.scheduled_jobs
-
-
-def test_add_job_daily_trigger(scheduler_manager):
-    """Test adding a job with daily trigger"""
-    with patch('scheduler.CronTrigger') as mock_cron:
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'daily',
-            {'hour': 9, 'minute': 30},
-            '123', 'Message'
-        )
-    
-    # Verify CronTrigger was created with correct parameters
-    mock_cron.assert_called_once()
-    call_kwargs = mock_cron.call_args[1]
-    assert call_kwargs['hour'] == 9
-    assert call_kwargs['minute'] == 30
-    
-    # Verify job was added to scheduler
-    scheduler_manager.scheduler.add_job.assert_called_once()
-
-
-def test_add_job_interval_trigger_hours(scheduler_manager):
-    """Test adding a job with interval trigger (hours)"""
-    with patch('scheduler.IntervalTrigger') as mock_interval:
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'interval',
-            {'interval': 2, 'unit': 'hours'},
-            '123', 'Message'
-        )
-    
-    # Verify IntervalTrigger was created
-    mock_interval.assert_called_once()
-    call_kwargs = mock_interval.call_args[1]
-    assert call_kwargs['hours'] == 2
-
-
-def test_add_job_interval_trigger_minutes(scheduler_manager):
-    """Test adding a job with interval trigger (minutes)"""
-    with patch('scheduler.IntervalTrigger') as mock_interval:
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'interval',
-            {'interval': 30, 'unit': 'minutes'},
-            '123', 'Message'
-        )
-    
-    # Verify IntervalTrigger was created
-    mock_interval.assert_called_once()
-    call_kwargs = mock_interval.call_args[1]
-    assert call_kwargs['minutes'] == 30
-
-
-def test_add_job_interval_trigger_seconds(scheduler_manager):
-    """Test adding a job with interval trigger (seconds)"""
-    with patch('scheduler.IntervalTrigger') as mock_interval:
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'interval',
-            {'interval': 10, 'unit': 'seconds'},
-            '123', 'Message'
-        )
-    
-    # Verify IntervalTrigger was created
-    mock_interval.assert_called_once()
-    call_kwargs = mock_interval.call_args[1]
-    assert call_kwargs['seconds'] == 10
-
-
-def test_add_job_cron_trigger(scheduler_manager):
-    """Test adding a job with cron trigger"""
-    with patch('scheduler.CronTrigger') as mock_cron:
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'cron',
-            {'expression': '0 9 * * MON'},
-            '123', 'Message'
-        )
-    
-    # Verify CronTrigger.from_crontab was called
-    mock_cron.from_crontab.assert_called_once_with('0 9 * * MON', timezone=ANY)
-
-
-def test_add_job_invalid_schedule_type(scheduler_manager):
-    """Test that invalid schedule type raises error"""
-    with pytest.raises(ValueError, match='Unknown schedule type'):
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'invalid_type',
-            {},
-            '123', 'Message'
-        )
-
-
-def test_add_job_invalid_interval_unit(scheduler_manager):
-    """Test that invalid interval unit raises error"""
-    with pytest.raises(ValueError, match='Unknown interval unit'):
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'interval',
-            {'interval': 5, 'unit': 'days'},
-            '123', 'Message'
-        )
-
-
-def test_add_job_calls_scheduler_add_job(scheduler_manager):
-    """Test that add_job_to_scheduler calls scheduler.add_job"""
-    with patch('scheduler.CronTrigger'):
-        scheduler_manager._add_job_to_scheduler(
-            'job_1', 'daily',
-            {'hour': 9, 'minute': 0},
-            '123', 'Message'
-        )
-    
-    # Verify scheduler.add_job was called with correct parameters
-    scheduler_manager.scheduler.add_job.assert_called_once()
-    call_args = scheduler_manager.scheduler.add_job.call_args
-    assert call_args[1]['id'] == 'job_1'
-    assert call_args[1]['args'] == ['123', 'Message']

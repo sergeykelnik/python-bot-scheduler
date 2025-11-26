@@ -1,10 +1,8 @@
 """Модуль для работы с планировщиком"""
 
 import logging
-import re
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 from config import WARSAW_TZ
 
 logger = logging.getLogger(__name__)
@@ -35,39 +33,21 @@ class SchedulerManager:
         
         return True
     
-    def _add_job_to_scheduler(self, job_id, schedule_type, schedule_data, chat_id, message):
-        """Helper to add different types of jobs to the scheduler."""
-        if schedule_type == 'daily':
-            trigger = CronTrigger(
-                hour=schedule_data['hour'],
-                minute=schedule_data['minute'],
-                timezone=WARSAW_TZ
-            )
-        elif schedule_type == 'interval':
-            if schedule_data['unit'] == 'hours':
-                trigger = IntervalTrigger(hours=schedule_data['interval'], timezone=WARSAW_TZ)
-            elif schedule_data['unit'] == 'minutes':
-                trigger = IntervalTrigger(minutes=schedule_data['interval'], timezone=WARSAW_TZ)
-            elif schedule_data['unit'] == 'seconds':
-                trigger = IntervalTrigger(seconds=schedule_data['interval'], timezone=WARSAW_TZ)
-            else:
-                raise ValueError(f"Unknown interval unit: {schedule_data['unit']}")
-        elif schedule_type == 'cron':
-            # Validate cron expression format before creating trigger
-            if not self._validate_cron_expression(schedule_data['expression']):
-                raise ValueError(f"Invalid cron format: {schedule_data['expression']}. Must have 5 fields.")
-            
-            # Convert from standard cron to APScheduler format
-            from schedule_manager import ScheduleManager
-            schedule_mgr = ScheduleManager()
-            converted_expression = schedule_mgr._convert_cron_to_apscheduler_format(schedule_data['expression'])
-            
-            try:
-                trigger = CronTrigger.from_crontab(converted_expression, timezone=WARSAW_TZ)
-            except Exception as e:
-                raise ValueError(f"Invalid cron expression: {schedule_data['expression']}. Error: {str(e)}")
-        else:
-            raise ValueError(f"Unknown schedule type: {schedule_type}")
+    def _add_job_to_scheduler(self, job_id, schedule_data, chat_id, message):
+        """Add a cron-based job to the scheduler."""
+        # Validate cron expression format before creating trigger
+        if not self._validate_cron_expression(schedule_data['expression']):
+            raise ValueError(f"Invalid cron format: {schedule_data['expression']}. Must have 5 fields.")
+        
+        # Convert from standard cron to APScheduler format
+        from schedule_manager import ScheduleManager
+        schedule_mgr = ScheduleManager()
+        converted_expression = schedule_mgr._convert_cron_to_apscheduler_format(schedule_data['expression'])
+        
+        try:
+            trigger = CronTrigger.from_crontab(converted_expression, timezone=WARSAW_TZ)
+        except Exception as e:
+            raise ValueError(f"Invalid cron expression: {schedule_data['expression']}. Error: {str(e)}")
 
         self.scheduler.add_job(
             self.bot.send_scheduled_message,
@@ -85,15 +65,9 @@ class SchedulerManager:
             job_id = schedule['job_id']
             schedule_data = schedule['schedule_data']
             
-            # Infer schedule type from schedule_data keys
-            if 'expression' in schedule_data:
-                schedule_type = 'cron'
-            elif 'interval' in schedule_data:
-                schedule_type = 'interval'
-            elif 'hour' in schedule_data and 'minute' in schedule_data:
-                schedule_type = 'daily'
-            else:
-                logger.warning(f"Could not determine schedule type for {job_id}")
+            # All schedules should have 'expression' key (cron format)
+            if 'expression' not in schedule_data:
+                logger.warning(f"Schedule {job_id} missing 'expression' key - skipping")
                 continue
             
             try:
@@ -101,7 +75,6 @@ class SchedulerManager:
                 if not schedule['is_paused']:
                     self._add_job_to_scheduler(
                         job_id,
-                        schedule_type,
                         schedule_data,
                         schedule['chat_id'],
                         schedule['message']
@@ -121,40 +94,12 @@ class SchedulerManager:
             except Exception as e:
                 logger.error(f"Failed to load schedule {job_id}: {e}")
     
-    def create_daily_schedule(self, job_id, chat_id, message, hour, minute):
-        """Создание ежедневного расписания"""
-        try:
-            schedule_data = {'hour': hour, 'minute': minute, 'description': f"Ежедневно в {hour:02d}:{minute:02d} (Europe/Warsaw)"}
-            self._add_job_to_scheduler(job_id, 'daily', schedule_data, chat_id, message)
-            return schedule_data
-        except Exception as e:
-            logger.error(f"Error creating daily schedule: {e}")
-            raise
-    
-    def create_interval_schedule(self, job_id, chat_id, message, interval, unit):
-        """Создание интервального расписания"""
-        try:
-            if unit == 'hours':
-                unit_desc = 'час(ов)'
-            elif unit == 'minutes':
-                unit_desc = 'минут(ы)'
-            elif unit == 'seconds':
-                unit_desc = 'секунд(ы)'
-            else:
-                raise ValueError(f"Unknown interval unit: {unit}")
-            
-            schedule_data = {'interval': interval, 'unit': unit, 'description': f"Каждые {interval} {unit_desc} (Europe/Warsaw)"}
-            self._add_job_to_scheduler(job_id, 'interval', schedule_data, chat_id, message)
-            return schedule_data
-        except Exception as e:
-            logger.error(f"Error creating interval schedule: {e}")
-            raise
     
     def create_cron_schedule(self, job_id, chat_id, message, cron_expression):
         """Создание cron расписания"""
         try:
             schedule_data = {'expression': cron_expression, 'description': f"Cron: {cron_expression} (Europe/Warsaw)"}
-            self._add_job_to_scheduler(job_id, 'cron', schedule_data, chat_id, message)
+            self._add_job_to_scheduler(job_id, schedule_data, chat_id, message)
             return schedule_data
         except Exception as e:
             logger.error(f"Error creating cron schedule: {e}")
@@ -174,17 +119,7 @@ class SchedulerManager:
     def resume_job(self, job_id, schedule_data, chat_id, message):
         """Возобновление работы"""
         try:
-            # Infer schedule type from schedule_data keys
-            if 'expression' in schedule_data:
-                schedule_type = 'cron'
-            elif 'interval' in schedule_data:
-                schedule_type = 'interval'
-            elif 'hour' in schedule_data and 'minute' in schedule_data:
-                schedule_type = 'daily'
-            else:
-                raise ValueError("Could not determine schedule type from schedule_data")
-            
-            self._add_job_to_scheduler(job_id, schedule_type, schedule_data, chat_id, message)
+            self._add_job_to_scheduler(job_id, schedule_data, chat_id, message)
             
             logger.info(f"Job {job_id} resumed successfully")
             return True
