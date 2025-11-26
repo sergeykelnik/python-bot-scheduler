@@ -215,3 +215,68 @@ def test_empty_get_schedules_for_user(temp_db):
     
     user_schedules = temp_db.get_schedules(user_id=999)
     assert user_schedules == []
+
+
+def test_add_recent_chat_id(temp_db):
+    """Test adding recent chat IDs"""
+    temp_db.add_recent_chat_id(123, 456)
+    
+    recent = temp_db.get_recent_chat_ids(123)
+    assert 456 in recent
+    assert len(recent) == 1
+
+
+def test_add_multiple_recent_chat_ids(temp_db):
+    """Test adding multiple recent chat IDs"""
+    temp_db.add_recent_chat_id(123, 456)
+    temp_db.add_recent_chat_id(123, 789)
+    temp_db.add_recent_chat_id(123, 101112)
+    
+    recent = temp_db.get_recent_chat_ids(123)
+    assert len(recent) == 3
+    assert 456 in recent
+    assert 789 in recent
+    assert 101112 in recent
+
+
+def test_recent_chat_ids_order(temp_db):
+    """Test that most recent chat ID is first"""
+    temp_db.add_recent_chat_id(123, 456)
+    temp_db.add_recent_chat_id(123, 789)
+    
+    recent = temp_db.get_recent_chat_ids(123)
+    assert recent[0] == 789  # Most recent should be first
+    assert recent[1] == 456
+
+
+def test_recent_chat_ids_max_limit(temp_db):
+    """Test that only max 5 recent chat IDs are stored"""
+    for i in range(10):
+        temp_db.add_recent_chat_id(123, 100 + i)
+    
+    recent = temp_db.get_recent_chat_ids(123)
+    assert len(recent) == 5  # Should only keep 5 most recent
+
+
+def test_duplicate_recent_chat_id_moves_to_front(temp_db):
+    """Test that adding duplicate chat ID moves it to front"""
+    temp_db.add_recent_chat_id(123, 456)
+    temp_db.add_recent_chat_id(123, 789)
+    temp_db.add_recent_chat_id(123, 456)  # Add again
+    
+    recent = temp_db.get_recent_chat_ids(123)
+    assert recent[0] == 456  # Should be moved to front
+    assert recent[1] == 789
+    assert len(recent) == 2
+
+
+def test_get_recent_chat_ids_empty(temp_db):
+    """Test getting recent chat IDs for user with none"""
+    recent = temp_db.get_recent_chat_ids(123)
+    assert recent == []
+
+
+def test_get_recent_chat_ids_nonexistent_user(temp_db):
+    """Test getting recent chat IDs for nonexistent user"""
+    recent = temp_db.get_recent_chat_ids(999)
+    assert recent == []

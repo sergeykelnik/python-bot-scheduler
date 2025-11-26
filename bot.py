@@ -6,6 +6,7 @@ import time
 from database import Database
 from scheduler import SchedulerManager
 from handlers import MessageHandlers, user_states
+from translations import Translator
 from config import BOT_TOKEN, LOG_FORMAT, LOG_LEVEL
 
 # Настройка логирования — поддерживаем как строковые, так и числовые уровни
@@ -19,35 +20,43 @@ class TelegramBot:
         self.base_url = f"https://api.telegram.org/bot{token}"
         
         # Инициализация компонентов
+        self.translator = Translator()
         self.db = Database()
         self.scheduler = SchedulerManager(self)
         self.handlers = MessageHandlers(self)
         
         self.last_update_id = 0
         
-        # Устанавливаем меню команд при инициализации
-        self.set_bot_commands()
+        # Устанавливаем меню команд для обоих языков при инициализации
+        self.set_bot_commands_for_all_languages()
     
-    def set_bot_commands(self):
-        """Установка меню команд бота"""
+    def set_bot_commands_for_all_languages(self):
+        """Установка меню команд бота для всех доступных языков"""
+        available_langs = self.translator.available_languages()
+        for lang in available_langs:
+            self.set_bot_commands(lang)
+    
+    def set_bot_commands(self, lang='ru'):
+        """Установка меню команд бота на указанном языке"""
         commands = [
-            {"command": "start", "description": "🚀 Запустить бота"},
-            {"command": "help", "description": "📖 Помощь и инструкции"},
-            {"command": "schedule", "description": "📅 Создать расписание"},
-            {"command": "list", "description": "📋 Мои расписания"},
-            {"command": "manage", "description": "⚙️ Управление расписаниями"},
-            {"command": "getchatid", "description": "🆔 Получить ID чата"}
+            {"command": "start", "description": self.translator.get_message('cmd_start', lang)},
+            {"command": "help", "description": self.translator.get_message('cmd_help', lang)},
+            {"command": "schedule", "description": self.translator.get_message('cmd_schedule', lang)},
+            {"command": "list", "description": self.translator.get_message('cmd_list', lang)},
+            {"command": "manage", "description": self.translator.get_message('cmd_manage', lang)},
+            {"command": "getchatid", "description": self.translator.get_message('cmd_getchatid', lang)}
         ]
         
         url = f"{self.base_url}/setMyCommands"
         data = {
-            "commands": commands
+            "commands": commands,
+            "language_code": lang
         }
         
         try:
             response = requests.post(url, json=data)
             if response.status_code == 200:
-                logger.info("✅ Меню команд бота успешно настроено")
+                logger.info(f"✅ Меню команд бота успешно настроено на языке: {lang}")
             else:
                 logger.error(f"❌ Ошибка настройки меню команд: {response.text}")
         except Exception as e:

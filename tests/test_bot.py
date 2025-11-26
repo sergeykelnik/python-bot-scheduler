@@ -41,12 +41,42 @@ def test_set_bot_commands(mock_bot):
         mock_response.json.return_value = {'ok': True}
         mock_post.return_value = mock_response
         
-        mock_bot.set_bot_commands()
+        mock_bot.set_bot_commands('ru')
         
         # Verify that post was called with correct URL
         assert mock_post.called
         call_args = mock_post.call_args
         assert '/setMyCommands' in call_args[0][0]
+
+
+def test_set_bot_commands_with_language(mock_bot):
+    """Test that bot commands are set with correct language"""
+    with patch('bot.requests.post') as mock_post:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'ok': True}
+        mock_post.return_value = mock_response
+        
+        mock_bot.set_bot_commands('en')
+        
+        # Verify that post was called
+        assert mock_post.called
+
+
+def test_set_bot_commands_for_all_languages(mock_bot):
+    """Test that bot commands are set for all available languages"""
+    with patch('bot.requests.post') as mock_post:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'ok': True}
+        mock_post.return_value = mock_response
+        
+        mock_bot.set_bot_commands_for_all_languages()
+        
+        # Verify that post was called for each language
+        assert mock_post.called
+        # Should be called at least once for each available language
+        assert mock_post.call_count >= 2
 
 
 def test_send_message_success(mock_bot):
