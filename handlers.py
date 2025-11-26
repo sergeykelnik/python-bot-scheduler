@@ -42,7 +42,6 @@ class MessageHandlers:
                 ],
                 [
                     {'text': self.translator.get_button('btn_manage', lang), 'callback_data': 'cmd:manage'},
-                    {'text': self.translator.get_button('btn_getchatid', lang), 'callback_data': 'cmd:getchatid'}
                 ],
                 [
                     {'text': self.translator.get_button('btn_help', lang), 'callback_data': 'cmd:help'}
