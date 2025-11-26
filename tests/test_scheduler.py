@@ -121,7 +121,7 @@ def test_resume_job(scheduler_manager):
     """Test resuming a job"""
     with patch.object(scheduler_manager, '_add_job_to_scheduler'):
         result = scheduler_manager.resume_job(
-            'job_1', 'daily', {'hour': 9, 'minute': 0}, '123', 'Message'
+            'job_1', {'hour': 9, 'minute': 0}, '123', 'Message'
         )
     
     assert result is True
@@ -131,7 +131,7 @@ def test_resume_job_error(scheduler_manager):
     """Test error handling when resuming a job"""
     with patch.object(scheduler_manager, '_add_job_to_scheduler', side_effect=Exception("Error")):
         result = scheduler_manager.resume_job(
-            'job_1', 'daily', {'hour': 9, 'minute': 0}, '123', 'Message'
+            'job_1', {'hour': 9, 'minute': 0}, '123', 'Message'
         )
     
     assert result is False
@@ -196,7 +196,6 @@ def test_load_schedules_from_db_single(scheduler_manager, mock_bot):
         'user_id': 123,
         'chat_id': '456',
         'message': 'Test message',
-        'schedule_type': 'daily',
         'schedule_data': {'hour': 9, 'minute': 0, 'description': 'Daily at 09:00'},
         'is_paused': False
     }
@@ -216,7 +215,6 @@ def test_load_schedules_from_db_paused_not_added(scheduler_manager, mock_bot):
         'user_id': 123,
         'chat_id': '456',
         'message': 'Test message',
-        'schedule_type': 'daily',
         'schedule_data': {'hour': 9, 'minute': 0, 'description': 'Daily at 09:00'},
         'is_paused': True
     }
@@ -240,7 +238,6 @@ def test_load_schedules_from_db_multiple(scheduler_manager, mock_bot):
             'user_id': 123 + i,
             'chat_id': f'{456 + i}',
             'message': f'Message {i}',
-            'schedule_type': 'daily',
             'schedule_data': {'hour': 9, 'minute': 0, 'description': f'Daily at 09:00'},
             'is_paused': False
         }
@@ -264,7 +261,6 @@ def test_load_schedules_from_db_with_error(scheduler_manager, mock_bot):
             'user_id': 123,
             'chat_id': '456',
             'message': 'Message 1',
-            'schedule_type': 'daily',
             'schedule_data': {'hour': 9, 'minute': 0},
             'is_paused': False
         },
@@ -273,7 +269,6 @@ def test_load_schedules_from_db_with_error(scheduler_manager, mock_bot):
             'user_id': 124,
             'chat_id': '457',
             'message': 'Message 2',
-            'schedule_type': 'daily',
             'schedule_data': {'hour': 10, 'minute': 0},
             'is_paused': False
         }

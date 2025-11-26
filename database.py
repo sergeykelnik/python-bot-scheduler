@@ -23,7 +23,6 @@ class Database:
                     user_id INTEGER NOT NULL,
                     chat_id TEXT NOT NULL,
                     message TEXT NOT NULL,
-                    schedule_type TEXT NOT NULL,
                     schedule_data TEXT NOT NULL,
                     is_paused INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -56,7 +55,6 @@ class Database:
                 'user_id': 'INTEGER NOT NULL',
                 'chat_id': 'TEXT NOT NULL',
                 'message': 'TEXT NOT NULL',
-                'schedule_type': 'TEXT NOT NULL',
                 'schedule_data': 'TEXT NOT NULL',
                 'is_paused': 'INTEGER DEFAULT 0',
                 'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'
@@ -121,13 +119,13 @@ class Database:
             if fetch_one:
                 return cursor.fetchone()
             return None
-    def save_schedule(self, job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused=False):
+    def save_schedule(self, job_id, user_id, chat_id, message, schedule_data, is_paused=False):
         """Сохранение расписания в базу данных"""
         self._execute_query('''
             INSERT OR REPLACE INTO schedules 
-            (job_id, user_id, chat_id, message, schedule_type, schedule_data, is_paused)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (job_id, user_id, chat_id, message, schedule_type, json.dumps(schedule_data), 1 if is_paused else 0))
+            (job_id, user_id, chat_id, message, schedule_data, is_paused)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (job_id, user_id, chat_id, message, json.dumps(schedule_data), 1 if is_paused else 0))
         logger.info(f"Schedule saved to database: {job_id}")
     
     def delete_schedule(self, job_id):
@@ -158,10 +156,9 @@ class Database:
                 'user_id': row[1],
                 'chat_id': row[2],
                 'message': row[3],
-                'schedule_type': row[4],
-                'schedule_data': json.loads(row[5]),
-                'is_paused': bool(row[6]),
-                'created_at': row[7]
+                'schedule_data': json.loads(row[4]),
+                'is_paused': bool(row[5]),
+                'created_at': row[6]
             })
         return schedules
 

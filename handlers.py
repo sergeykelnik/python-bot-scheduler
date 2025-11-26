@@ -384,7 +384,7 @@ class MessageHandlers:
                         not_found = self.translator.get_message('msg_callback_not_found', lang)
                         self.bot.answer_callback_query(cq_id, text=not_found, show_alert=True)
                         return
-                    success = self.bot.scheduler.resume_job(job_id, target['schedule_type'], target['schedule_data'], target['chat_id'], target['message'])
+                    success = self.bot.scheduler.resume_job(job_id, target['schedule_data'], target['chat_id'], target['message'])
                     if success:
                         job['is_paused'] = False
                         self.bot.db.update_schedule_pause_status(job_id, False)
@@ -557,31 +557,33 @@ class MessageHandlers:
         try:
             schedule_text = schedule_text.strip()
             schedule_data = {}
-            schedule_type = ""
             
             schedule_text_lower = schedule_text.lower()
 
             if schedule_text_lower.startswith('daily'):
                 hour, minute = self._parse_daily_schedule(schedule_text)
                 schedule_data = self.bot.scheduler.create_daily_schedule(job_id, state['chat_id'], state['message'], hour, minute)
-                schedule_type = 'daily'
             elif schedule_text_lower.startswith('every'):
                 interval, unit = self._parse_interval_schedule(schedule_text)
                 schedule_data = self.bot.scheduler.create_interval_schedule(job_id, state['chat_id'], state['message'], interval, unit)
-                schedule_type = 'interval'
             else:
                 # Attempt to parse as cron directly, or fallback to AI
                 try:
-                    # Basic cron validation (5 parts)
+                    # Validate cron expression (5 parts)
                     cron_parts = schedule_text.split()
                     if len(cron_parts) == 5:
-                        schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
-                        schedule_type = 'cron'
+                        # Try to create cron schedule directly
+                        try:
+                            schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], schedule_text)
+                        except Exception as cron_error:
+                            # If direct cron parsing fails, try AI parser
+                            logger.warning(f"Direct cron parsing failed: {cron_error}. Trying AI parser.")
+                            cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
+                            schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
                     else:
                         # Fallback to AI parser for natural language or malformed cron
                         cron_expr = self.schedule_manager._parse_schedule_with_ai(schedule_text)
                         schedule_data = self.bot.scheduler.create_cron_schedule(job_id, state['chat_id'], state['message'], cron_expr)
-                        schedule_type = 'cron'
                 except Exception as e:
                     error_prefix = self.translator.get_message('msg_error_schedule_unknown', lang)
                     raise ValueError(f"{error_prefix}{e}")
@@ -601,7 +603,6 @@ class MessageHandlers:
                 user_id=user_id,
                 chat_id=state['chat_id'],
                 message=state['message'],
-                schedule_type=schedule_type,
                 schedule_data=schedule_data,
                 is_paused=False
             )

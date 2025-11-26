@@ -24,7 +24,6 @@ def sample_schedule():
         'user_id': 123,
         'chat_id': '456',
         'message': 'Test message',
-        'schedule_type': 'daily',
         'schedule_data': {'hour': 9, 'minute': 0, 'description': 'Daily at 09:00'},
         'is_paused': False
     }
@@ -48,7 +47,6 @@ def test_save_schedule(temp_db, sample_schedule):
         user_id=sample_schedule['user_id'],
         chat_id=sample_schedule['chat_id'],
         message=sample_schedule['message'],
-        schedule_type=sample_schedule['schedule_type'],
         schedule_data=sample_schedule['schedule_data'],
         is_paused=sample_schedule['is_paused']
     )
@@ -68,7 +66,6 @@ def test_save_schedule_multiple(temp_db):
             user_id=123,
             chat_id='456',
             message=f'Message {i}',
-            schedule_type='daily',
             schedule_data={'hour': 9, 'minute': 0},
             is_paused=False
         )
@@ -80,9 +77,9 @@ def test_save_schedule_multiple(temp_db):
 def test_get_schedules_by_user(temp_db):
     """Test retrieving schedules for a specific user"""
     # Save schedules for different users
-    temp_db.save_schedule('job_1', 123, '456', 'Message 1', 'daily', {'hour': 9, 'minute': 0}, False)
-    temp_db.save_schedule('job_2', 789, '012', 'Message 2', 'daily', {'hour': 10, 'minute': 0}, False)
-    temp_db.save_schedule('job_3', 123, '456', 'Message 3', 'interval', {'interval': 30, 'unit': 'minutes'}, False)
+    temp_db.save_schedule('job_1', 123, '456', 'Message 1', {'hour': 9, 'minute': 0}, False)
+    temp_db.save_schedule('job_2', 789, '012', 'Message 2', {'hour': 10, 'minute': 0}, False)
+    temp_db.save_schedule('job_3', 123, '456', 'Message 3', {'interval': 30, 'unit': 'minutes'}, False)
     
     # Get schedules for user 123
     user_schedules = temp_db.get_schedules(user_id=123)
@@ -97,7 +94,6 @@ def test_delete_schedule(temp_db, sample_schedule):
         user_id=sample_schedule['user_id'],
         chat_id=sample_schedule['chat_id'],
         message=sample_schedule['message'],
-        schedule_type=sample_schedule['schedule_type'],
         schedule_data=sample_schedule['schedule_data']
     )
     
@@ -129,7 +125,6 @@ def test_update_schedule_pause_status(temp_db, sample_schedule):
         user_id=sample_schedule['user_id'],
         chat_id=sample_schedule['chat_id'],
         message=sample_schedule['message'],
-        schedule_type=sample_schedule['schedule_type'],
         schedule_data=sample_schedule['schedule_data'],
         is_paused=False
     )
@@ -166,7 +161,6 @@ def test_save_schedule_with_complex_data(temp_db):
         user_id=123,
         chat_id='456',
         message='Complex schedule',
-        schedule_type='cron',
         schedule_data=complex_data
     )
     
@@ -176,10 +170,10 @@ def test_save_schedule_with_complex_data(temp_db):
 
 def test_replace_existing_schedule(temp_db):
     """Test that saving with same job_id replaces the schedule"""
-    temp_db.save_schedule('job_1', 123, '456', 'Original message', 'daily', {'hour': 9, 'minute': 0}, False)
+    temp_db.save_schedule('job_1', 123, '456', 'Original message', {'hour': 9, 'minute': 0}, False)
     
     # Save with same job_id but different data
-    temp_db.save_schedule('job_1', 123, '789', 'Updated message', 'daily', {'hour': 10, 'minute': 0}, False)
+    temp_db.save_schedule('job_1', 123, '789', 'Updated message', {'hour': 10, 'minute': 0}, False)
     
     schedules = temp_db.get_schedules()
     assert len(schedules) == 1
@@ -196,7 +190,7 @@ def test_schedule_data_json_serialization(temp_db):
     }
     
     temp_db.save_schedule(
-        'job_1', 123, '456', 'Message', 'custom', original_data
+        'job_1', 123, '456', 'Message', original_data
     )
     
     schedules = temp_db.get_schedules()
@@ -211,7 +205,7 @@ def test_empty_get_schedules(temp_db):
 
 def test_empty_get_schedules_for_user(temp_db):
     """Test getting schedules for a user with no schedules"""
-    temp_db.save_schedule('job_1', 123, '456', 'Message', 'daily', {'hour': 9, 'minute': 0})
+    temp_db.save_schedule('job_1', 123, '456', 'Message', {'hour': 9, 'minute': 0})
     
     user_schedules = temp_db.get_schedules(user_id=999)
     assert user_schedules == []
