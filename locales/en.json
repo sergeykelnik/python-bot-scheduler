@@ -104,6 +104,5 @@
   "cmd_help": "📖 Help and instructions",
   "cmd_schedule": "📅 Create a schedule",
   "cmd_list": "📋 My schedules",
-  "cmd_manage": "⚙️ Manage schedules",
-  "cmd_getchatid": "🆔 Get chat ID"
+  "cmd_manage": "⚙️ Manage schedules"
 }

@@ -43,8 +43,7 @@ class TelegramBot:
             {"command": "help", "description": self.translator.get_message('cmd_help', lang)},
             {"command": "schedule", "description": self.translator.get_message('cmd_schedule', lang)},
             {"command": "list", "description": self.translator.get_message('cmd_list', lang)},
-            {"command": "manage", "description": self.translator.get_message('cmd_manage', lang)},
-            {"command": "getchatid", "description": self.translator.get_message('cmd_getchatid', lang)}
+            {"command": "manage", "description": self.translator.get_message('cmd_manage', lang)}
         ]
         
         url = f"{self.base_url}/setMyCommands"
