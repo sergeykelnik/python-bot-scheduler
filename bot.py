@@ -169,8 +169,6 @@ class TelegramBot:
                 self.handlers.handle_list(chat_id, user_id)
             elif command == '/manage':
                 self.handlers.handle_manage(chat_id, user_id)
-            elif command == '/getchatid':
-                self.handlers.handle_getchatid(chat_id, user_id)
         else:
             # Обработка обычных текстовых сообщений
             self.handlers.handle_text_message(chat_id, user_id, text)

@@ -303,23 +303,6 @@ def test_process_update_manage_command(mock_bot):
     mock_bot.handlers.handle_manage.assert_called_once_with(123, 456)
 
 
-def test_process_update_getchatid_command(mock_bot):
-    """Test processing /getchatid command"""
-    update = {
-        'update_id': 1,
-        'message': {
-            'chat': {'id': 123},
-            'from': {'id': 456},
-            'text': '/getchatid'
-        }
-    }
-    
-    mock_bot.handlers.handle_getchatid = Mock()
-    mock_bot.process_update(update)
-    
-    mock_bot.handlers.handle_getchatid.assert_called_once_with(123, 456)
-
-
 def test_process_update_callback_query(mock_bot):
     """Test processing callback query from inline buttons"""
     update = {
