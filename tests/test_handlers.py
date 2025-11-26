@@ -138,16 +138,6 @@ def test_handle_help(handlers, mock_bot):
     assert 'Помощь' in call_args[0][1] or 'daily' in call_args[0][1]
 
 
-def test_handle_getchatid(handlers, mock_bot):
-    """Test /getchatid command handler"""
-    handlers.handle_getchatid(123, 456)
-    
-    # Verify send_message was called with chat ID
-    mock_bot.send_message.assert_called_once()
-    call_args = mock_bot.send_message.call_args
-    assert '123' in call_args[0][1]  # chat_id should be in the message
-
-
 def test_handle_schedule(handlers, mock_bot):
     """Test /schedule command handler"""
     user_id = 456

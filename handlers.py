@@ -37,11 +37,15 @@ class MessageHandlers:
                     {'text': self.translator.get_button('btn_lang_ru', lang), 'callback_data': 'lang:ru'}
                 ],
                 [
-                    {'text': self.translator.get_button('btn_schedule', lang), 'callback_data': 'cmd:schedule'},
+                    {'text': self.translator.get_button('btn_schedule', lang), 'callback_data': 'cmd:schedule'}
+                ],
+                [
                     {'text': self.translator.get_button('btn_list', lang), 'callback_data': 'cmd:list'}
                 ],
                 [
                     {'text': self.translator.get_button('btn_manage', lang), 'callback_data': 'cmd:manage'},
+                ],
+                [
                     {'text': self.translator.get_button('btn_help', lang), 'callback_data': 'cmd:help'}
                 ]
             ]
@@ -73,7 +77,6 @@ class MessageHandlers:
         cmd_sch = self.translator.get_message('msg_help_cmd_schedule', lang)
         cmd_lst = self.translator.get_message('msg_help_cmd_list', lang)
         cmd_mng = self.translator.get_message('msg_help_cmd_manage', lang)
-        cmd_id = self.translator.get_message('msg_help_cmd_getchatid', lang)
         cmd_hlp = self.translator.get_message('msg_help_cmd_help', lang)
         tip = self.translator.get_message('msg_help_tip', lang)
         
@@ -100,7 +103,6 @@ class MessageHandlers:
             f"{cmd_sch}\n"
             f"{cmd_lst}\n"
             f"{cmd_mng}\n"
-            f"{cmd_id}\n"
             f"{cmd_hlp}\n\n"
             f"{tip}"
         )
@@ -190,12 +192,6 @@ class MessageHandlers:
             # send a separate message per job with inline buttons
             self.bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     
-    def handle_getchatid(self, chat_id, user_id):
-        """Обработка команды /getchatid"""
-        lang = self._get_lang(user_id)
-        msg_key = self.translator.get_message('msg_getchatid', lang)
-        self.bot.send_message(chat_id, f"{msg_key}{chat_id}`")
-
     # --- Helpers for interactive manage ---
     def _build_job_text(self, job_id, job_info, lang='ru'):
         paused = self.translator.get_message('msg_list_status_paused', lang)
@@ -347,8 +343,6 @@ class MessageHandlers:
                     self.handle_list(chat_id, from_user)
                 elif cmd == 'manage':
                     self.handle_manage(chat_id, from_user)
-                elif cmd == 'getchatid':
-                    self.handle_getchatid(chat_id, from_user)
                 elif cmd == 'help':
                     self.handle_help(chat_id, from_user)
                 else:
