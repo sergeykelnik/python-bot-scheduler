@@ -1,20 +1,36 @@
-
-"""Модуль для работы с базой данных"""
+"""
+Module for database operations.
+"""
 
 import sqlite3
 import json
 import logging
-from config import DB_PATH
+import os
+from typing import List, Dict, Any, Optional
+from src.core.config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
 class Database:
-    def __init__(self, db_path=DB_PATH):
+    """Class to handle SQLite database interactions."""
+    
+    def __init__(self, db_path: str = DB_PATH):
+        """
+        Initialize the database connection.
+        
+        Args:
+            db_path: Path to the SQLite database file.
+        """
         self.db_path = db_path
         self.init_database()
     
     def init_database(self):
-        """Инициализация базы данных и создание таблиц"""
+        """Initialize database tables and validation."""
+        # Ensure directory exists if path has one
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -43,11 +59,9 @@ class Database:
         logger.info("Database initialized")
     
     def _validate_and_migrate_schema(self):
-        """Validate and update database schema to match current requirements.
-        
-        This method ensures that old databases have all necessary columns added.
-        It compares the actual database schema with the expected schema and
-        adds missing columns with appropriate defaults.
+        """
+        Validate and update database schema to match current requirements.
+        Ensures that existing databases have all necessary columns added.
         """
         expected_schema = {
             'schedules': {
@@ -80,13 +94,14 @@ class Database:
         except sqlite3.OperationalError as e:
             logger.error(f"Error during schema migration: {e}")
     
-    def _migrate_table_schema(self, cursor, table_name, expected_columns):
-        """Migrate a single table's schema to match expected columns.
-        
+    def _migrate_table_schema(self, cursor: sqlite3.Cursor, table_name: str, expected_columns: Dict[str, str]):
+        """
+        Migrate a single table's schema to match expected columns.
+
         Args:
-            cursor: SQLite cursor object
-            table_name: Name of the table to migrate
-            expected_columns: Dict of column_name -> column_definition
+            cursor: SQLite cursor object.
+            table_name: Name of the table to migrate.
+            expected_columns: Dictionary mapping column names to definitions.
         """
         try:
             # Get current columns
@@ -109,7 +124,19 @@ class Database:
         except sqlite3.OperationalError as e:
             logger.warning(f"Could not migrate table {table_name}: {e}")
     
-    def _execute_query(self, query, params=None, fetch_all=False, fetch_one=False):
+    def _execute_query(self, query: str, params: tuple = None, fetch_all: bool = False, fetch_one: bool = False) -> Any:
+        """
+        Helper method to execute database queries.
+        
+        Args:
+            query: SQL query string.
+            params: Tuple of query parameters.
+            fetch_all: Whether to return all rows.
+            fetch_one: Whether to return a single row.
+            
+        Returns:
+            Result set (list, tuple) or None.
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
@@ -119,8 +146,19 @@ class Database:
             if fetch_one:
                 return cursor.fetchone()
             return None
-    def save_schedule(self, job_id, user_id, chat_id, message, schedule_data, is_paused=False):
-        """Сохранение расписания в базу данных"""
+
+    def save_schedule(self, job_id: str, user_id: int, chat_id: str, message: str, schedule_data: dict, is_paused: bool = False):
+        """
+        Save schedule to the database.
+
+        Args:
+            job_id: Unique identifier for the job.
+            user_id: ID of the user creating the schedule.
+            chat_id: Target chat ID.
+            message: Message content.
+            schedule_data: Dictionary containing cron expression and description.
+            is_paused: Pause status.
+        """
         self._execute_query('''
             INSERT OR REPLACE INTO schedules 
             (job_id, user_id, chat_id, message, schedule_data, is_paused)
@@ -128,64 +166,72 @@ class Database:
         ''', (job_id, user_id, chat_id, message, json.dumps(schedule_data), 1 if is_paused else 0))
         logger.info(f"Schedule saved to database: {job_id}")
     
-    def delete_schedule(self, job_id):
-        """Удаление расписания из базы данных"""
+    def delete_schedule(self, job_id: str):
+        """Delete schedule from database."""
         self._execute_query('DELETE FROM schedules WHERE job_id = ?', (job_id,))
         logger.info(f"Schedule deleted from database: {job_id}")
     
-    def update_schedule_pause_status(self, job_id, is_paused):
-        """Обновление статуса паузы расписания"""
+    def update_schedule_pause_status(self, job_id: str, is_paused: bool):
+        """Update the pause status of a schedule."""
         self._execute_query('''
             UPDATE schedules SET is_paused = ? WHERE job_id = ?
         ''', (1 if is_paused else 0, job_id))
         logger.info(f"Schedule {job_id} pause status updated to: {is_paused}")
     
+    def get_schedules(self, user_id: Optional[int] = None) -> List[Dict]:
+        """
+        Get all schedules or filter by user_id.
 
-    
-    def get_schedules(self, user_id=None):
-        """Получение всех расписаний из базы данных или для конкретного пользователя"""
+        Args:
+            user_id: Optional user ID filter.
+            
+        Returns:
+            List of schedule dictionaries.
+        """
         schedules = []
         if user_id:
             rows = self._execute_query('SELECT * FROM schedules WHERE user_id = ?', (user_id,), fetch_all=True)
         else:
             rows = self._execute_query('SELECT * FROM schedules', fetch_all=True)
             
-        for row in rows:
-            schedules.append({
-                'job_id': row[0],
-                'user_id': row[1],
-                'chat_id': row[2],
-                'message': row[3],
-                'schedule_data': json.loads(row[4]),
-                'is_paused': bool(row[5]),
-                'created_at': row[6]
-            })
+        if rows:
+            for row in rows:
+                schedules.append({
+                    'job_id': row[0],
+                    'user_id': row[1],
+                    'chat_id': row[2],
+                    'message': row[3],
+                    'schedule_data': json.loads(row[4]),
+                    'is_paused': bool(row[5]),
+                    'created_at': row[6]
+                })
         return schedules
 
-    def get_user_language(self, user_id, default='ru'):
+    def get_user_language(self, user_id: int, default: str = 'ru') -> str:
         """Get user's language preference or return default."""
         row = self._execute_query('SELECT language FROM users WHERE user_id = ?', (user_id,), fetch_one=True)
         if row and row[0]:
             return row[0]
         return default
 
-    def set_user_language(self, user_id, language):
+    def set_user_language(self, user_id: int, language: str):
         """Set user's language preference."""
-        # Try to insert; if user exists, update
         try:
             self._execute_query('''
                 INSERT INTO users (user_id, language, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
             ''', (user_id, language))
         except sqlite3.IntegrityError:
-            # User already exists, update language
             self._execute_query('''
                 UPDATE users SET language = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?
             ''', (language, user_id))
 
-    def add_recent_chat_id(self, user_id, chat_id, max_items=5):
-        """Add a chat_id to user's recent contacts list."""
+    def add_recent_chat_id(self, user_id: int, chat_id: int, max_items: int = 5):
+        """
+        Add a chat_id to user's recent contacts list.
+        Maintains a fixed size list (max_items).
+        """
         try:
             row = self._execute_query(
                 'SELECT recent_chat_ids FROM users WHERE user_id = ?', 
@@ -221,7 +267,7 @@ class Database:
         except Exception as e:
             logger.error(f"Error adding recent chat_id: {e}")
 
-    def get_recent_chat_ids(self, user_id):
+    def get_recent_chat_ids(self, user_id: int) -> List[int]:
         """Get user's recent chat IDs."""
         try:
             row = self._execute_query(
