@@ -50,20 +50,12 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "Docker Compose is not installed."
+if ! docker compose version &> /dev/null; then
+    echo "Docker Compose plugin is not installed."
     echo ""
-    read -p "Would you like to install Docker Compose now? (y/n): " install_compose
-    
-    if [[ $install_compose =~ ^[Yy]$ ]]; then
-        echo "Installing Docker Compose..."
-        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        sudo chmod +x /usr/local/bin/docker-compose
-        echo "Docker Compose installed successfully!"
-    else
-        echo "Docker Compose installation cancelled. Please install it manually: https://docs.docker.com/compose/install/"
-        exit 1
-    fi
+    echo "This should have been installed with Docker."
+    echo "Please reinstall Docker or install the compose plugin manually."
+    exit 1
 fi
 
 # Prompt for environment variables if .env doesn't exist
@@ -93,17 +85,17 @@ fi
 
 # Stop existing container if running
 echo "Stopping existing containers..."
-docker-compose down 2>/dev/null || true
+docker compose down 2>/dev/null || true
 echo ""
 
 # Build the Docker image
 echo "Building Docker image..."
-docker-compose build
+docker compose build
 echo ""
 
 # Start the container
 echo "Starting the bot..."
-docker-compose up -d
+docker compose up -d
 echo ""
 
 # Show status
@@ -112,9 +104,9 @@ echo "Deployment completed successfully!"
 echo "==================================="
 echo ""
 echo "Bot status:"
-docker-compose ps
+docker compose ps
 echo ""
-echo "To view logs: docker-compose logs -f"
-echo "To stop bot: docker-compose down"
-echo "To restart bot: docker-compose restart"
+echo "To view logs: docker compose logs -f"
+echo "To stop bot: docker compose down"
+echo "To restart bot: docker compose restart"
 echo ""
