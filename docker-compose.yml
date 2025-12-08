@@ -6,8 +6,8 @@ services:
     container_name: python_bot_scheduler
     restart: unless-stopped
     volumes:
-      # Persist the database
-      - bot_data:/app
+      # Mount database file from host (allows easy replacement)
+      - ./schedules.db:/app/schedules.db
       # Mount local time to container (optional, helpful for scheduling)
       - /etc/localtime:/etc/localtime:ro
     environment:
@@ -15,6 +15,3 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - LOG_LEVEL=INFO
       - SCHEDULES_DB_PATH=/app/schedules.db
-
-volumes:
-  bot_data:
