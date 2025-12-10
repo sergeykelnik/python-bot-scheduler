@@ -47,7 +47,6 @@
   "msg_schedule_step1_hint": "(Use 'me' to send to yourself, or specify chat ID)",
   "msg_select_saved_contact": "Select a saved contact:",
   "msg_no_saved_contacts": "You have no saved contacts yet. Please enter a chat ID manually.",
-  "msg_no_saved_contacts": "You don't have any saved contacts yet. Enter a chat ID to save it.",
   "msg_schedule_step2": "Step 2: Enter the message you want to send: 📩",
   "msg_schedule_step3_title": "Step 3: Choose a schedule type:",
   "msg_schedule_step3_hint": "Enter your schedule:",

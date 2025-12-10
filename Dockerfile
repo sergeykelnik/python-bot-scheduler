@@ -1,5 +1,5 @@
 # Use official Python runtime as a parent image
-FROM python:3.10-slim as builder
+FROM python:3.14-slim as builder
 
 # Set work directory
 WORKDIR /app
@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Final stage
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
