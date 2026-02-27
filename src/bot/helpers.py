@@ -2,10 +2,15 @@
 Shared helpers used by both handlers and callbacks routers.
 """
 
+import logging
 from typing import List, Dict
+
+from aiogram import Bot
 
 from src.bot.database import Database
 from src.bot.translation_service import TranslationService
+
+logger = logging.getLogger(__name__)
 
 
 async def get_lang(db: Database, user_id: int) -> str:
@@ -14,6 +19,19 @@ async def get_lang(db: Database, user_id: int) -> str:
         return await db.get_user_language(user_id)
     except Exception:
         return "ru"
+
+
+async def validate_chat_id(bot: Bot, chat_id: str) -> bool:
+    """Check whether the bot can reach the given chat_id.
+
+    Returns True if reachable, False otherwise.
+    """
+    try:
+        await bot.get_chat(chat_id)
+        return True
+    except Exception as e:
+        logger.debug("Chat %s is unreachable: %s", chat_id, e)
+        return False
 
 
 def build_help_text(tr: TranslationService, lang: str) -> str:

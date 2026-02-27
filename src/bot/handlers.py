@@ -5,7 +5,7 @@ Command & text-message handlers (aiogram Router).
 import logging
 from datetime import datetime
 
-from aiogram import Router, F
+from aiogram import Bot, Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
@@ -15,7 +15,7 @@ from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
 from src.bot.ai_service import AIService
-from src.bot.helpers import get_lang, build_help_text, build_list_text, build_job_text
+from src.bot.helpers import get_lang, build_help_text, build_list_text, build_job_text, validate_chat_id
 from src.bot import keyboards as kb
 
 logger = logging.getLogger(__name__)
@@ -104,9 +104,15 @@ async def cmd_manage(message: Message, db: Database, translator: TranslationServ
 # ------------------------------------------------------------------
 
 @router.message(StateFilter(ScheduleWizard.waiting_chat_id), F.text)
-async def wizard_chat_id(message: Message, state: FSMContext, db: Database, translator: TranslationService, **_):
+async def wizard_chat_id(message: Message, bot: Bot, state: FSMContext, db: Database, translator: TranslationService, **_):
     lang = await get_lang(db, message.from_user.id)
     target = str(message.chat.id) if message.text.lower() == "me" else message.text
+
+    # Validate the bot can reach this chat
+    if not await validate_chat_id(bot, target):
+        msg = translator.get_message("msg_chat_unreachable", lang).replace("{chat_id}", target)
+        await message.answer(msg)
+        return  # Stay in waiting_chat_id state so user can retry
 
     try:
         if str(target).lstrip("-").isdigit():
