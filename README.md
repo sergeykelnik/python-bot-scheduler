@@ -1,6 +1,6 @@
 # Telegram Scheduled Messages Bot
 
-A Python-based Telegram bot for scheduling messages with persistent storage, internationalization, and natural language parsing.
+A Telegram bot for scheduling messages, built with **aiogram 3.25.0**, featuring persistent storage, internationalization, and AI-powered natural language parsing.
 
 ## Features
 
@@ -8,6 +8,7 @@ A Python-based Telegram bot for scheduling messages with persistent storage, int
 - **Multilingual**: Supports English and Russian.
 - **Persistent Storage**: Uses SQLite to save schedules between restarts.
 - **Interactive Management**: Manage your schedules via inline buttons (Pause, Resume, Delete).
+- **Fully Async**: Built on aiogram 3.x, aiosqlite, and APScheduler's AsyncIOScheduler.
 
 ## Quick Start
 
@@ -17,8 +18,6 @@ A Python-based Telegram bot for scheduling messages with persistent storage, int
 - Groq API Key (optional, for AI natural language parsing)
 
 ### 2. Installation
-
-Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/sergeykelnik/python-bot-scheduler.git
@@ -45,8 +44,6 @@ LOG_LEVEL=INFO
 
 ### 4. Usage
 
-Run the bot:
-
 ```bash
 python main.py
 ```
@@ -61,11 +58,24 @@ python main.py
 
 ## Project Structure
 
-- `main.py` - Entry point.
-- `src/`
-  - `bot/` - Telegram bot logic and handlers.
-  - `core/` - Configuration and database.
-  - `services/` - Business logic (Scheduler, AI, Translation).
+```
+├── main.py              # Entry point
+├── src/bot/             # Bot application
+│   ├── bot.py           # Bot & Dispatcher setup, lifecycle
+│   ├── handlers.py      # Command handlers + FSM wizard
+│   ├── callbacks.py     # Inline button callback handlers
+│   ├── helpers.py       # Shared text builders & utilities
+│   ├── keyboards.py     # Inline keyboard builders
+│   ├── states.py        # FSM states (ScheduleWizard)
+│   ├── config.py        # Configuration (env vars)
+│   ├── database.py      # Async SQLite (aiosqlite)
+│   ├── scheduler_service.py  # AsyncIOScheduler + cron
+│   ├── ai_service.py    # Groq AI for NLP → cron
+│   └── translation_service.py  # i18n from locales/
+├── locales/             # Translation files (en.json, ru.json)
+├── tests/               # Smoke tests
+└── schedules.db         # SQLite database
+```
 
 ## License
 

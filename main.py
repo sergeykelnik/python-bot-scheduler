@@ -1,22 +1,27 @@
 """
-Main entry point for the Python Bot Scheduler.
+Entry point for the Telegram Bot Scheduler.
 """
 
-import os
-import logging
-from src.core.config import BOT_TOKEN
-from src.bot.telegram_bot import TelegramBot
+import asyncio
+import sys
 
-# logger configuration is handled in src.core.config and src.bot.telegram_bot
+from src.bot.config import BOT_TOKEN
 
-if __name__ == '__main__':
-    if BOT_TOKEN == 'YOUR_BOT_TOKEN_HERE':
+
+async def main() -> None:
+    if BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         print("ERROR: Please provide a valid bot token!")
         print("Option 1: Set environment variable")
         print("  $env:TELEGRAM_BOT_TOKEN='your_token_here'")
         print("Option 2: Replace 'YOUR_BOT_TOKEN_HERE' in .env file")
-        exit(1)
-    
-    # Create and start the bot
-    bot = TelegramBot(BOT_TOKEN)
-    bot.start_polling()
+        sys.exit(1)
+
+    from src.bot.bot import build_bot_and_dispatcher
+
+    bot, dp = build_bot_and_dispatcher()
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
