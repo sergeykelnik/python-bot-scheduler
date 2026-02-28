@@ -1,15 +1,12 @@
 services:
   bot:
     build: .
-    container_name: python_bot_scheduler
+    container_name: python-bot-scheduler
     restart: unless-stopped
-    volumes:
-      # Mount database file from host (allows easy replacement)
-      - ./schedules.db:/app/schedules.db
-      # Mount local time to container (optional, helpful for scheduling)
-      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - LOG_LEVEL=INFO
-      - SCHEDULES_DB_PATH=/app/schedules.db
+      - SCHEDULES_DB_PATH=/data/schedules.db
+    volumes:
+      - ./schedules.db:/data/schedules.db
+

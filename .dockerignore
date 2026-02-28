@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+
+# Version control
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Tests
+tests/
+.pytest_cache/
+
+# Documentation
+README.md
+DEPLOYMENT.md
+LLM_CONTEXT.md
+
+# Local database (if using volume mount)
+schedules.db
+
+# Deployment scripts
+deploy.sh
+
+# Docker files (not needed inside image)
+Dockerfile
+docker-compose.yml
+.dockerignore
