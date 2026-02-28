@@ -15,7 +15,7 @@ load_dotenv()
 WARSAW_TZ = pytz.timezone("Europe/Warsaw")
 
 # Tokens
-BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN")
+BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GROQ_TOKEN: str | None = os.getenv("GROQ_API_KEY")
 
 # Database

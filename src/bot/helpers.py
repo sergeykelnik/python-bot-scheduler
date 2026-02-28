@@ -79,11 +79,12 @@ def build_list_text(schedules: List[Dict], tr: TranslationService, lang: str) ->
     for job in schedules:
         status = m["msg_list_status_paused"] if job["is_paused"] else m["msg_list_status_active"]
         desc = job["schedule_data"].get("description", "Unknown")
+        msg_preview = job["message"][:50] + ("…" if len(job["message"]) > 50 else "")
         text += (
             f"{m['msg_list_id']}{job['job_id']}`\n"
             f"{m['msg_list_status']}{status}\n"
             f"{m['msg_list_target']}{job['chat_id']}\n"
-            f"{m['msg_list_message']}{job['message'][:50]}...\n"
+            f"{m['msg_list_message']}{msg_preview}\n"
             f"{m['msg_list_schedule']}{desc}`\n"
             "─────────────\n"
         )

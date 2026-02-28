@@ -2,7 +2,6 @@
 Callback-query handlers (aiogram Router).
 """
 
-import asyncio
 import logging
 
 from aiogram import Bot, Router, F
@@ -46,7 +45,6 @@ async def cb_language(
     **_,
 ):
     new_lang = cq.data.split(":")[1]
-    await asyncio.sleep(0.1)
 
     commands = [
         BotCommand(command="start", description=translator.get_message("cmd_start", new_lang)),

@@ -65,8 +65,10 @@ class AIService:
             if cron_expression.upper().startswith("ERROR:"):
                 raise ValueError(cron_expression)
 
-            # Strip potential markdown fences
-            cron_expression = re.sub(r"```.*?```", "", cron_expression, flags=re.DOTALL).strip()
+            # Strip potential markdown fences (```cron\n...\n``` or ```...```)
+            fence_match = re.search(r"```(?:\w*\n)?(.*?)```", cron_expression, flags=re.DOTALL)
+            if fence_match:
+                cron_expression = fence_match.group(1).strip()
 
             return cron_expression
 

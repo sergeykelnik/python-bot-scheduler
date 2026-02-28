@@ -9,7 +9,7 @@ from src.bot.config import BOT_TOKEN
 
 
 async def main() -> None:
-    if BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         print("ERROR: Please provide a valid bot token!")
         print("Option 1: Set environment variable")
         print("  $env:TELEGRAM_BOT_TOKEN='your_token_here'")
@@ -19,9 +19,14 @@ async def main() -> None:
     from src.bot.bot import build_bot_and_dispatcher
 
     bot, dp = build_bot_and_dispatcher()
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass

@@ -191,7 +191,10 @@ class Database:
 
     async def set_user_language(self, user_id: int, language: str) -> None:
         await self._execute(
-            "INSERT OR REPLACE INTO users (user_id, language, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            """
+            INSERT INTO users (user_id, language, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, updated_at = excluded.updated_at
+            """,
             (user_id, language),
         )
 
