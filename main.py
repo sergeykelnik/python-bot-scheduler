@@ -9,11 +9,12 @@ from src.bot.config import BOT_TOKEN
 
 
 async def main() -> None:
-    if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+    if not BOT_TOKEN:
         print("ERROR: Please provide a valid bot token!")
         print("Option 1: Set environment variable")
         print("  $env:TELEGRAM_BOT_TOKEN='your_token_here'")
-        print("Option 2: Replace 'YOUR_BOT_TOKEN_HERE' in .env file")
+        print("Option 2: Create or update a .env file with:")
+        print("  TELEGRAM_BOT_TOKEN=your_token_here")
         sys.exit(1)
 
     from src.bot.bot import build_bot_and_dispatcher
