@@ -1,6 +1,6 @@
 {
-  "btn_lang_en": "🇺🇸 English",
-  "btn_lang_ru": "🇷🇺 Русский",
+  "btn_lang_en": "English",
+  "btn_lang_ru": "Русский",
   "btn_schedule": "📅 Create",
   "btn_list": "📋 My Schedules",
   "btn_manage": "⚙️ Manage",
@@ -47,6 +47,7 @@
   "msg_schedule_step1_hint": "(Use 'me' to send to yourself, or specify chat ID)",
   "msg_select_saved_contact": "Select a saved contact:",
   "msg_no_saved_contacts": "You have no saved contacts yet. Please enter a chat ID manually.",
+  "msg_chat_unreachable": "⚠️ The bot cannot reach chat `{chat_id}`. Make sure the bot is added to that chat. Please choose another target.",
   "msg_schedule_step2": "Step 2: Enter the message you want to send: 📩",
   "msg_schedule_step3_title": "Step 3: Choose a schedule type:",
   "msg_schedule_step3_hint": "Enter your schedule:",
