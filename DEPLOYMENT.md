@@ -3,6 +3,8 @@
 ## Quick Start
 
 ```bash
+git clone https://github.com/sergeykelnik/python-bot-scheduler.git
+cd python-bot-scheduler
 chmod +x deploy.sh
 ./deploy.sh
 ```
