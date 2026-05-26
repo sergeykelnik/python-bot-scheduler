@@ -10,7 +10,7 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from src.bot.states import ScheduleWizard
+from src.bot.states import ScheduleWizard, EditWizard
 from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
@@ -198,3 +198,96 @@ async def wizard_schedule(
             f"{mk['msg_error_restart']}"
         )
         await message.answer(error_text, reply_markup=kb.restart_button(translator, lang))
+
+
+# ------------------------------------------------------------------
+# Edit Wizard – text messages for editing existing schedule
+# ------------------------------------------------------------------
+
+@router.message(StateFilter(EditWizard.waiting_message), F.text)
+async def edit_message(
+    message: Message,
+    state: FSMContext,
+    db: Database,
+    translator: TranslationService,
+    **_,
+):
+    lang = await get_lang(db, message.from_user.id)
+    await state.update_data(message_text=message.text)
+    await state.set_state(EditWizard.waiting_schedule)
+
+    keys = [
+        "msg_schedule_step3_title", "msg_schedule_examples",
+        "msg_help_daily", "msg_help_every_minutes", "msg_help_every_hours",
+        "msg_help_cron_monday", "msg_schedule_step3_hint",
+    ]
+    m = {k: translator.get_message(k, lang) for k in keys}
+    text = (
+        f"{m['msg_schedule_step3_title']}\n\n"
+        f"{m['msg_schedule_examples']}\n"
+        f"{m['msg_help_daily']}\n{m['msg_help_every_minutes']}\n"
+        f"{m['msg_help_every_hours']}\n{m['msg_help_cron_monday']}\n\n"
+        f"{m['msg_schedule_step3_hint']}"
+    )
+    await message.answer(text)
+
+
+@router.message(StateFilter(EditWizard.waiting_schedule), F.text)
+async def edit_schedule(
+    message: Message,
+    state: FSMContext,
+    db: Database,
+    translator: TranslationService,
+    scheduler: SchedulerService,
+    ai_service: AIService,
+    **_,
+):
+    lang = await get_lang(db, message.from_user.id)
+    data = await state.get_data()
+    job_id = data.get("job_id")
+    original_job = data.get("original_job")
+
+    if not job_id or not original_job:
+        await message.answer(translator.get_message("msg_error_internal", lang))
+        await state.clear()
+        return
+
+    try:
+        cron_expr = await ai_service.parse_schedule_to_cron(message.text.strip())
+        schedule_data = scheduler.add_job(
+            job_id,
+            original_job["chat_id"],
+            data["message_text"],
+            cron_expr
+        )
+
+        await db.update_schedule(
+            job_id=job_id,
+            message=data["message_text"],
+            schedule_data=schedule_data,
+        )
+
+        mk = {k: translator.get_message(k, lang) for k in [
+            "msg_success_edited", "msg_success_id", "msg_success_schedule", "msg_success_target",
+        ]}
+        text = (
+            f"{mk['msg_success_edited']}\n\n"
+            f"{mk['msg_success_id']}{job_id}`\n"
+            f"{mk['msg_success_schedule']}{schedule_data['description']}`\n"
+            f"{mk['msg_success_target']}{original_job['chat_id']}\n"
+        )
+        await message.answer(text, reply_markup=kb.success_keyboard(translator, lang, job_id))
+        await state.clear()
+
+    except Exception as e:
+        logger.error("Error editing schedule: %s", e)
+        mk = {k: translator.get_message(k, lang) for k in [
+            "msg_error_edit", "msg_error_retry", "msg_error_restart",
+        ]}
+        error_text = (
+            f"{mk['msg_error_edit']}{e}\n\n"
+            f"{mk['msg_error_retry']}\n"
+            f"{mk['msg_error_restart']}"
+        )
+        await message.answer(error_text, reply_markup=kb.restart_button(translator, lang))
+

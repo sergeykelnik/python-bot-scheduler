@@ -62,17 +62,20 @@ def saved_contacts_keyboard(
 def job_manage_keyboard(
     tr: TranslationService, lang: str, job_id: str, is_paused: bool
 ) -> InlineKeyboardMarkup:
+    row1 = [
+        InlineKeyboardButton(text=tr.get_button("btn_edit", lang), callback_data=f"manage:edit:{job_id}"),
+    ]
     if is_paused:
-        buttons = [
+        row2 = [
             InlineKeyboardButton(text=tr.get_button("btn_resume", lang), callback_data=f"manage:resume:{job_id}"),
             InlineKeyboardButton(text=tr.get_button("btn_delete", lang), callback_data=f"manage:delete:{job_id}"),
         ]
     else:
-        buttons = [
+        row2 = [
             InlineKeyboardButton(text=tr.get_button("btn_pause", lang), callback_data=f"manage:pause:{job_id}"),
             InlineKeyboardButton(text=tr.get_button("btn_delete", lang), callback_data=f"manage:delete:{job_id}"),
         ]
-    return InlineKeyboardMarkup(inline_keyboard=[buttons])
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2])
 
 
 def confirm_delete_keyboard(
@@ -114,6 +117,16 @@ def manage_button(tr: TranslationService, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=tr.get_button("btn_manage", lang), callback_data="cmd:manage")]
+        ]
+    )
+
+
+def cancel_edit_keyboard(tr: TranslationService, lang: str, job_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=tr.get_button("btn_cancel", lang), callback_data=f"cancel_edit:{job_id}"),
+            ]
         ]
     )
 

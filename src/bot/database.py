@@ -151,6 +151,22 @@ class Database:
         )
         logger.info("Schedule %s pause → %s", job_id, is_paused)
 
+    async def update_schedule(
+        self,
+        job_id: str,
+        message: str,
+        schedule_data: dict,
+    ) -> None:
+        await self._execute(
+            """
+            UPDATE schedules
+            SET message = ?, schedule_data = ?
+            WHERE job_id = ?
+            """,
+            (message, json.dumps(schedule_data), job_id),
+        )
+        logger.info("Schedule %s updated", job_id)
+
     async def get_schedules(self, user_id: Optional[int] = None) -> List[Dict]:
         if user_id is not None:
             rows = await self._execute(

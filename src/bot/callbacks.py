@@ -8,7 +8,7 @@ from aiogram import Bot, Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup
 
-from src.bot.states import ScheduleWizard
+from src.bot.states import ScheduleWizard, EditWizard
 from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
@@ -210,6 +210,7 @@ async def cb_manage_action(
     db: Database,
     translator: TranslationService,
     scheduler: SchedulerService,
+    state: FSMContext,
     **_,
 ):
     parts = cq.data.split(":")
@@ -259,6 +260,43 @@ async def cb_manage_action(
             reply_markup=kb.confirm_delete_keyboard(translator, lang, job_id),
         )
         await cq.answer()
+
+    elif subaction == "edit":
+        await state.set_state(EditWizard.waiting_message)
+        await state.update_data(job_id=job_id, original_job=job)
+        await cq.answer()
+        msg = translator.get_message("msg_edit_step1", lang)
+        current_msg = job["message"]
+        await cq.message.answer(f"{msg}\n\n*Current message:*\n{current_msg}", reply_markup=kb.cancel_edit_keyboard(translator, lang, job_id))
+
+
+# ------------------------------------------------------------------
+# Edit confirmation / cancellation
+# ------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("cancel_edit:"))
+async def cb_cancel_edit(
+    cq: CallbackQuery,
+    db: Database,
+    translator: TranslationService,
+    state: FSMContext,
+    **_,
+):
+    job_id = cq.data.split(":")[1]
+    user_id = cq.from_user.id
+    lang = await get_lang(db, user_id)
+
+    job = await _get_job(db, job_id, user_id)
+    if not job:
+        await cq.answer()
+        return
+
+    await state.clear()
+    await cq.message.edit_text(
+        build_job_text(job, translator, lang),
+        reply_markup=kb.job_manage_keyboard(translator, lang, job_id, job["is_paused"]),
+    )
+    await cq.answer(translator.get_message("msg_callback_cancelled", lang))
 
 
 # ------------------------------------------------------------------
