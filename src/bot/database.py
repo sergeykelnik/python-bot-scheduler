@@ -168,14 +168,13 @@ class Database:
         logger.info("Schedule %s updated", job_id)
 
     async def get_schedules(self, user_id: Optional[int] = None) -> List[Dict]:
+        query = "SELECT job_id, user_id, chat_id, message, schedule_data, is_paused, created_at FROM schedules"
+        params = ()
         if user_id is not None:
-            rows = await self._execute(
-                "SELECT * FROM schedules WHERE user_id = ?",
-                (user_id,),
-                fetch_all=True,
-            )
-        else:
-            rows = await self._execute("SELECT * FROM schedules", fetch_all=True)
+            query += " WHERE user_id = ?"
+            params = (user_id,)
+        
+        rows = await self._execute(query, params, fetch_all=True)
 
         schedules: List[Dict] = []
         if rows:

@@ -6,6 +6,7 @@ import logging
 from typing import List, Dict
 
 from aiogram import Bot
+from aiogram.utils.markdown import hbold, hcode, hitalic
 
 from src.bot.database import Database
 from src.bot.translation_service import TranslationService
@@ -81,11 +82,11 @@ def build_list_text(schedules: List[Dict], tr: TranslationService, lang: str) ->
         desc = job["schedule_data"].get("description", "Unknown")
         msg_preview = job["message"][:50] + ("…" if len(job["message"]) > 50 else "")
         text += (
-            f"{m['msg_list_id']}{job['job_id']}`\n"
+            f"{m['msg_list_id']}{hcode(job['job_id'])}\n"
             f"{m['msg_list_status']}{status}\n"
-            f"{m['msg_list_target']}{job['chat_id']}\n"
-            f"{m['msg_list_message']}{msg_preview}\n"
-            f"{m['msg_list_schedule']}{desc}`\n"
+            f"{m['msg_list_target']}{hcode(job['chat_id'])}\n"
+            f"{m['msg_list_message']}{hitalic(msg_preview)}\n"
+            f"{m['msg_list_schedule']}{hcode(desc)}\n"
             "─────────────\n"
         )
     text += f"\n{m['msg_list_use_manage']}"
@@ -103,10 +104,10 @@ def build_job_text(job: dict, tr: TranslationService, lang: str) -> str:
     status = m["msg_list_status_paused"] if job.get("is_paused") else m["msg_list_status_active"]
     sched_desc = job.get("schedule_data", {}).get("description") or job.get("schedule", "")
     return (
-        f"{m['msg_job_id']}{job.get('job_id', '')}`\n"
+        f"{m['msg_job_id']}{hcode(job.get('job_id', ''))}\n"
         f"{m['msg_job_status']}{status}\n"
-        f"{m['msg_job_target']}{job.get('chat_id', '')}\n"
-        f"{m['msg_job_message']}{job.get('message', '')}\n"
-        f"{m['msg_job_schedule']}{sched_desc}`\n"
+        f"{m['msg_job_target']}{hcode(job.get('chat_id', ''))}\n"
+        f"{m['msg_job_message']}{hitalic(job.get('message', ''))}\n"
+        f"{m['msg_job_schedule']}{hcode(sched_desc)}\n"
     )
 

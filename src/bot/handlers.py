@@ -9,6 +9,7 @@ from aiogram import Bot, Router, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+from aiogram.utils.markdown import hbold, hcode, hpre, hlink
 
 from src.bot.states import ScheduleWizard, EditWizard
 from src.bot.database import Database
@@ -180,9 +181,9 @@ async def wizard_schedule(
         ]}
         text = (
             f"{mk['msg_success_created']}\n\n"
-            f"{mk['msg_success_id']}{job_id}`\n"
-            f"{mk['msg_success_schedule']}{schedule_data['description']}`\n"
-            f"{mk['msg_success_target']}{data['chat_id']}\n"
+            f"{mk['msg_success_id']}{hcode(job_id)}\n"
+            f"{mk['msg_success_schedule']}{hcode(schedule_data['description'])}\n"
+            f"{mk['msg_success_target']}{hcode(data['chat_id'])}\n"
         )
         await message.answer(text, reply_markup=kb.success_keyboard(translator, lang, job_id))
         await state.clear()
@@ -272,9 +273,9 @@ async def edit_schedule(
         ]}
         text = (
             f"{mk['msg_success_edited']}\n\n"
-            f"{mk['msg_success_id']}{job_id}`\n"
-            f"{mk['msg_success_schedule']}{schedule_data['description']}`\n"
-            f"{mk['msg_success_target']}{original_job['chat_id']}\n"
+            f"{mk['msg_success_id']}{hcode(job_id)}\n"
+            f"{mk['msg_success_schedule']}{hcode(schedule_data['description'])}\n"
+            f"{mk['msg_success_target']}{hcode(original_job['chat_id'])}\n"
         )
         await message.answer(text, reply_markup=kb.success_keyboard(translator, lang, job_id))
         await state.clear()

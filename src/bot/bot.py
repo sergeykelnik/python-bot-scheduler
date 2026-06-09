@@ -27,7 +27,7 @@ def build_bot_and_dispatcher():
 
     bot = Bot(
         token=BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
     async def send_scheduled_message(chat_id: str, message: str) -> None:

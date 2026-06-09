@@ -5,6 +5,7 @@ Callback-query handlers (aiogram Router).
 import logging
 
 from aiogram import Bot, Router, F
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand, CallbackQuery, InlineKeyboardMarkup
 
@@ -13,6 +14,7 @@ from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
 from src.bot.helpers import get_lang, build_help_text, build_list_text, build_job_text, validate_chat_id
+from aiogram.utils.markdown import hbold, hcode, hitalic
 from src.bot import keyboards as kb
 
 logger = logging.getLogger(__name__)
@@ -254,7 +256,7 @@ async def cb_manage_action(
 
     elif subaction == "delete":
         confirm_prefix = translator.get_message("msg_confirm_delete", lang)
-        confirm_text = f"{confirm_prefix}{job_id}`\n\n" + build_job_text(job, translator, lang)
+        confirm_text = f"{confirm_prefix}{hcode(job_id)}\n\n" + build_job_text(job, translator, lang)
         await cq.message.edit_text(
             confirm_text,
             reply_markup=kb.confirm_delete_keyboard(translator, lang, job_id),
@@ -267,7 +269,7 @@ async def cb_manage_action(
         await cq.answer()
         msg = translator.get_message("msg_edit_step1", lang)
         current_msg = job["message"]
-        await cq.message.answer(f"{msg}\n\n*Current message:*\n{current_msg}", reply_markup=kb.cancel_edit_keyboard(translator, lang, job_id))
+        await cq.message.answer(f"{msg}\n\n<b>Current message:</b>\n{hitalic(current_msg)}", reply_markup=kb.edit_message_keyboard(translator, lang, job_id))
 
 
 # ------------------------------------------------------------------
@@ -297,6 +299,49 @@ async def cb_cancel_edit(
         reply_markup=kb.job_manage_keyboard(translator, lang, job_id, job["is_paused"]),
     )
     await cq.answer(translator.get_message("msg_callback_cancelled", lang))
+
+
+@router.callback_query(F.data.startswith("edit_keep:"), StateFilter(EditWizard.waiting_message))
+async def cb_edit_keep_message(
+    cq: CallbackQuery,
+    db: Database,
+    translator: TranslationService,
+    state: FSMContext,
+    **_,
+):
+    parts = cq.data.split(":")
+    if len(parts) != 2:
+        await cq.answer()
+        return
+
+    user_id = cq.from_user.id
+    lang = await get_lang(db, user_id)
+    data = await state.get_data()
+    original_job = data.get("original_job")
+
+    if not original_job:
+        await cq.answer(translator.get_message("msg_error_internal", lang), show_alert=True)
+        return
+
+    await state.update_data(message_text=original_job["message"])
+    await state.set_state(EditWizard.waiting_schedule)
+
+    await cq.answer()
+    
+    keys = [
+        "msg_schedule_step3_title", "msg_schedule_examples",
+        "msg_help_daily", "msg_help_every_minutes", "msg_help_every_hours",
+        "msg_help_cron_monday", "msg_schedule_step3_hint",
+    ]
+    m = {k: translator.get_message(k, lang) for k in keys}
+    text = (
+        f"{m['msg_schedule_step3_title']}\n\n"
+        f"{m['msg_schedule_examples']}\n"
+        f"{m['msg_help_daily']}\n{m['msg_help_every_minutes']}\n"
+        f"{m['msg_help_every_hours']}\n{m['msg_help_cron_monday']}\n\n"
+        f"{m['msg_schedule_step3_hint']}"
+    )
+    await cq.message.answer(text)
 
 
 # ------------------------------------------------------------------

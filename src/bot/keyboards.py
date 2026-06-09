@@ -131,6 +131,19 @@ def cancel_edit_keyboard(tr: TranslationService, lang: str, job_id: str) -> Inli
     )
 
 
+def edit_message_keyboard(tr: TranslationService, lang: str, job_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=tr.get_button("btn_keep_current", lang), callback_data=f"edit_keep:{job_id}"),
+            ],
+            [
+                InlineKeyboardButton(text=tr.get_button("btn_cancel", lang), callback_data=f"cancel_edit:{job_id}"),
+            ]
+        ]
+    )
+
+
 def restart_button(tr: TranslationService, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
