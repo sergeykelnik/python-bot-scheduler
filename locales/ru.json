@@ -5,6 +5,8 @@
   "btn_list": "📋 Мои расписания",
   "btn_manage": "⚙️ Управление",
   "btn_help": "📖 Помощь",
+  "btn_timezone": "🌍 Часовой пояс",
+  "btn_location": "📍 Моё местоположение",
   "btn_me": "👤 Отправить себе",
   "btn_saved_contacts": "📇 Сохранённые контакты",
   "btn_enter_manually": "⌨️ Ввести вручную",
@@ -25,7 +27,7 @@
   "msg_help_step2": "2. Введите 'me' (или укажите chat ID получателя)",
   "msg_help_step3": "3. Введите сообщение",
   "msg_help_step4": "4. Выберите тип расписания",
-  "msg_help_step5": "5. Все расписания работают по Центральноевропейскому времени",
+  "msg_help_step5": "5. Расписания работают по вашему настроенному часовому поясу (по умолчанию: Europe/Warsaw)",
   "msg_help_examples": "<b>Примеры простых расписаний:</b>",
   "msg_help_daily": "`daily 09:00` - Каждый день в 09:00",
   "msg_help_every_minutes": "`every 30 minutes` - Каждые 30 минут",
@@ -89,6 +91,12 @@
   "msg_callback_deleted": "Расписание удалено",
   "msg_callback_cancelled": "Отменено",
   "msg_callback_permissions": "У вас нет прав для этого действия",
+   "msg_timezone_title": "🌍 <b>Настройки часового пояса</b>",
+   "msg_timezone_current": "Ваш текущий часовой пояс: ",
+   "msg_timezone_instruction": "Выберите часовой пояс из предложенных вариантов. Все расписания будут работать по Europe/Warsaw.",
+   "msg_timezone_changed": "✅ Часовой пояс изменён на ",
+   "msg_timezone_global": "Все ваши расписания будут использовать часовой пояс: <b>Europe/Warsaw</b>",
+   "msg_location_request": "Пожалуйста, нажмите кнопку ниже, чтобы поделиться местоположением.",
   "msg_callback_not_found": "Расписание не найдено",
   "msg_callback_pause_error": "Ошибка при приостановке",
   "msg_callback_resume_error": "Ошибка при возобновлении",
@@ -108,5 +116,6 @@
   "cmd_help": "📖 Помощь и инструкции",
   "cmd_schedule": "📅 Создать расписание",
   "cmd_list": "📋 Мои расписания",
-  "cmd_manage": "⚙️ Управление расписаниями"
+  "cmd_manage": "⚙️ Управление расписаниями",
+  "cmd_timezone": "🌍 Установить часовой пояс"
 }

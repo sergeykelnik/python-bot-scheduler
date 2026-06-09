@@ -5,6 +5,8 @@
   "btn_list": "📋 My Schedules",
   "btn_manage": "⚙️ Manage",
   "btn_help": "📖 Help",
+  "btn_timezone": "🌍 Timezone",
+  "btn_location": "📍 My Location",
   "btn_getchatid": "🆔 Get Chat ID",
   "btn_me": "👤 Send to Me",
   "btn_saved_contacts": "📇 Saved Contacts",
@@ -26,7 +28,7 @@
   "msg_help_step2": "2. Enter 'me' (or specify chat ID of the recipient)",
   "msg_help_step3": "3. Enter the message",
   "msg_help_step4": "4. Choose a schedule type",
-  "msg_help_step5": "5. All schedules work in Central European Time",
+  "msg_help_step5": "5. Schedules work in your configured timezone (default: Europe/Warsaw)",
   "msg_help_examples": "<b>Simple Schedule Examples:</b>",
   "msg_help_daily": "`daily 09:00` - Every day at 09:00",
   "msg_help_every_minutes": "`every 30 minutes` - Every 30 minutes",
@@ -90,6 +92,12 @@
   "msg_callback_deleted": "Schedule deleted",
   "msg_callback_cancelled": "Cancelled",
   "msg_callback_permissions": "You don't have permission for this action",
+   "msg_timezone_title": "🌍 <b>Timezone Settings</b>",
+   "msg_timezone_current": "Your current timezone: ",
+   "msg_timezone_instruction": "Select your timezone from the options below. All schedules will use Europe/Warsaw.",
+   "msg_timezone_changed": "✅ Timezone changed to ",
+   "msg_timezone_global": "All your schedules will use the timezone: <b>Europe/Warsaw</b>",
+   "msg_location_request": "Please click the button below to share your location.",
   "msg_callback_not_found": "Schedule not found",
   "msg_callback_pause_error": "Error pausing schedule",
   "msg_callback_resume_error": "Error resuming schedule",
@@ -109,5 +117,6 @@
   "cmd_help": "📖 Help and instructions",
   "cmd_schedule": "📅 Create a schedule",
   "cmd_list": "📋 My schedules",
-  "cmd_manage": "⚙️ Manage schedules"
+  "cmd_manage": "⚙️ Manage schedules",
+  "cmd_timezone": "🌍 Set timezone"
 }

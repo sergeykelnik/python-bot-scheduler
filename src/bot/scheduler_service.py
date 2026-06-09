@@ -5,6 +5,7 @@ Scheduler service built on APScheduler AsyncIOScheduler.
 import logging
 from typing import Any, Callable, Coroutine, Dict, Set, Tuple
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -159,6 +160,7 @@ class SchedulerService:
         chat_id: str,
         message: str,
         cron_expression: str,
+        timezone: str = "Europe/Warsaw",
     ) -> Dict[str, str]:
         is_valid, err = self.validate_cron_expression(cron_expression)
         if not is_valid:
@@ -167,7 +169,8 @@ class SchedulerService:
         aps_expr = self._convert_cron_to_apscheduler_format(cron_expression)
 
         try:
-            trigger = CronTrigger.from_crontab(aps_expr, timezone=WARSAW_TZ)
+            tz = pytz.timezone(timezone)
+            trigger = CronTrigger.from_crontab(aps_expr, timezone=tz)
             self.scheduler.add_job(
                 self.callback_func,
                 trigger,
@@ -175,7 +178,7 @@ class SchedulerService:
                 id=job_id,
                 replace_existing=True,
             )
-            description = f"Cron: {cron_expression} (Europe/Warsaw)"
+            description = f"Cron: {cron_expression} ({timezone})"
             return {"expression": cron_expression, "description": description}
         except Exception as e:
             logger.error("Error adding job %s: %s", job_id, e)
@@ -193,10 +196,10 @@ class SchedulerService:
             return False
 
     def resume_job(
-        self, job_id: str, cron_expression: str, chat_id: str, message: str
+        self, job_id: str, cron_expression: str, chat_id: str, message: str, timezone: str = "Europe/Warsaw"
     ) -> bool:
         try:
-            self.add_job(job_id, chat_id, message, cron_expression)
+            self.add_job(job_id, chat_id, message, cron_expression, timezone=timezone)
             logger.info("Job %s resumed.", job_id)
             return True
         except Exception as e:

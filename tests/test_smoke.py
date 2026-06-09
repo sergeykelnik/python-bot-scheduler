@@ -72,6 +72,23 @@ async def test_user_language_smoke(temp_db):
     assert await db.get_user_language(999) == "ru"
 
 
+@pytest.mark.asyncio
+async def test_user_timezone_smoke(temp_db):
+    """Verify user timezone preference CRUD."""
+    db = temp_db
+
+    # Default
+    assert await db.get_user_timezone(888) == "Europe/Warsaw"
+
+    # Set
+    await db.set_user_timezone(888, "America/New_York")
+    assert await db.get_user_timezone(888) == "America/New_York"
+
+    # Update
+    await db.set_user_timezone(888, "Asia/Tokyo")
+    assert await db.get_user_timezone(888) == "Asia/Tokyo"
+
+
 # --- Scheduler Smoke Tests ---
 
 @pytest.fixture
@@ -93,8 +110,10 @@ def test_scheduler_add_job(scheduler_service):
         chat_id="202",
         message="Smoke Test",
         cron_expression="0 12 * * *",
+        timezone="America/New_York",
     )
     assert res["expression"] == "0 12 * * *"
+    assert "America/New_York" in res["description"]
     assert "description" in res
 
 
@@ -114,12 +133,13 @@ def test_scheduler_invalid_cron(scheduler_service):
 
 def test_bot_build_smoke(mocker):
     """Verify bot and dispatcher build without errors and wire all components."""
-    mocker.patch("src.bot.bot.Bot")
+    mocker.patch("aiogram.Bot")
+    mocker.patch("src.bot.bot.Database")
     mocker.patch("src.bot.bot.SchedulerService")
     mocker.patch("src.bot.bot.AIService")
 
-    from src.bot.bot import build_bot_and_dispatcher
-    bot, dp = build_bot_and_dispatcher()
+    import src.bot.bot
+    bot, dp = src.bot.bot.build_bot_and_dispatcher()
 
     assert dp["db"] is not None
     assert dp["translator"] is not None

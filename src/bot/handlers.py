@@ -16,6 +16,7 @@ from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
 from src.bot.ai_service import AIService
+from src.bot.config import WARSAW_TZ
 from src.bot.helpers import get_lang, build_help_text, build_list_text, build_job_text, validate_chat_id
 from src.bot import keyboards as kb
 
@@ -165,7 +166,9 @@ async def wizard_schedule(
 
     try:
         cron_expr = await ai_service.parse_schedule_to_cron(message.text.strip())
-        schedule_data = scheduler.add_job(job_id, data["chat_id"], data["message_text"], cron_expr)
+        schedule_data = scheduler.add_job(
+            job_id, data["chat_id"], data["message_text"], cron_expr, timezone=WARSAW_TZ.zone
+        )
 
         await db.save_schedule(
             job_id=job_id,
@@ -202,7 +205,22 @@ async def wizard_schedule(
 
 
 # ------------------------------------------------------------------
-# Edit Wizard – text messages for editing existing schedule
+# /timezone
+# ------------------------------------------------------------------
+
+@router.message(Command("timezone"))
+async def cmd_timezone(message: Message, db: Database, translator: TranslationService, **_):
+    user_id = message.from_user.id
+    lang = await get_lang(db, user_id)
+
+    title = translator.get_message("msg_timezone_title", lang)
+    instruction = translator.get_message("msg_timezone_instruction", lang)
+    
+    await message.answer(
+        f"{title}\n\n{instruction}",
+        reply_markup=kb.timezone_keyboard(translator, lang)
+    )
+
 # ------------------------------------------------------------------
 
 @router.message(StateFilter(EditWizard.waiting_message), F.text)
@@ -259,7 +277,8 @@ async def edit_schedule(
             job_id,
             original_job["chat_id"],
             data["message_text"],
-            cron_expr
+            cron_expr,
+            timezone=WARSAW_TZ.zone
         )
 
         await db.update_schedule(

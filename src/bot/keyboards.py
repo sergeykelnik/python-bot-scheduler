@@ -19,6 +19,7 @@ def start_keyboard(tr: TranslationService, lang: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=tr.get_button("btn_schedule", lang), callback_data="cmd:schedule")],
             [InlineKeyboardButton(text=tr.get_button("btn_list", lang), callback_data="cmd:list")],
             [InlineKeyboardButton(text=tr.get_button("btn_manage", lang), callback_data="cmd:manage")],
+            [InlineKeyboardButton(text=tr.get_button("btn_timezone", lang), callback_data="cmd:timezone")],
             [InlineKeyboardButton(text=tr.get_button("btn_help", lang), callback_data="cmd:help")],
         ]
     )
@@ -142,6 +143,17 @@ def edit_message_keyboard(tr: TranslationService, lang: str, job_id: str) -> Inl
             ]
         ]
     )
+
+
+def timezone_keyboard(tr: TranslationService, lang: str) -> InlineKeyboardMarkup:
+    # Common timezones to choose from
+    common_tz = ["UTC", "Europe/London", "Europe/Warsaw", "Europe/Moscow", "America/New_York", "Asia/Tokyo", "Asia/Dubai"]
+    rows = []
+    for i in range(0, len(common_tz), 2):
+        row = [InlineKeyboardButton(text=tz, callback_data=f"set_tz:{tz}") for tz in common_tz[i:i+2]]
+        rows.append(row)
+    
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def restart_button(tr: TranslationService, lang: str) -> InlineKeyboardMarkup:

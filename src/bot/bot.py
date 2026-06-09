@@ -16,14 +16,13 @@ from src.bot.scheduler_service import SchedulerService
 from src.bot.ai_service import AIService
 from src.bot.handlers import router as handlers_router
 from src.bot.callbacks import router as callbacks_router
+from src.bot.config import BOT_TOKEN, WARSAW_TZ
 
 logger = logging.getLogger(__name__)
 
 
 def build_bot_and_dispatcher():
     """Construct and return (Bot, Dispatcher) with all services wired."""
-
-    from src.bot.config import BOT_TOKEN
 
     bot = Bot(
         token=BOT_TOKEN,
@@ -66,6 +65,7 @@ def build_bot_and_dispatcher():
                 BotCommand(command="schedule", description=translator.get_message("cmd_schedule", lang)),
                 BotCommand(command="list", description=translator.get_message("cmd_list", lang)),
                 BotCommand(command="manage", description=translator.get_message("cmd_manage", lang)),
+                BotCommand(command="timezone", description=translator.get_message("cmd_timezone", lang)),
             ]
             await bot.set_my_commands(commands, language_code=lang)
 
@@ -80,6 +80,7 @@ def build_bot_and_dispatcher():
                         s["chat_id"],
                         s["message"],
                         s["schedule_data"]["expression"],
+                        timezone=WARSAW_TZ.zone,
                     )
                 except Exception as e:
                     logger.error("Failed to restore job %s: %s", s["job_id"], e)

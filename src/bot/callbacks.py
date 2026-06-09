@@ -14,6 +14,7 @@ from src.bot.database import Database
 from src.bot.translation_service import TranslationService
 from src.bot.scheduler_service import SchedulerService
 from src.bot.helpers import get_lang, build_help_text, build_list_text, build_job_text, validate_chat_id
+from src.bot.config import WARSAW_TZ
 from aiogram.utils.markdown import hbold, hcode, hitalic
 from src.bot import keyboards as kb
 
@@ -201,6 +202,15 @@ async def cb_cmd(
     elif cmd == "help":
         await bot.send_message(chat_id, build_help_text(translator, lang), reply_markup=kb.help_keyboard(translator, lang))
 
+    elif cmd == "timezone":
+        title = translator.get_message("msg_timezone_title", lang)
+        instruction = translator.get_message("msg_timezone_instruction", lang)
+        await bot.send_message(
+            chat_id,
+            f"{title}\n\n{instruction}",
+            reply_markup=kb.timezone_keyboard(translator, lang)
+        )
+
 
 # ------------------------------------------------------------------
 # Manage actions   manage:pause:<id> / manage:resume:<id> / manage:delete:<id>
@@ -243,7 +253,7 @@ async def cb_manage_action(
 
     elif subaction == "resume":
         sd = job["schedule_data"]
-        if scheduler.resume_job(job_id, sd["expression"], job["chat_id"], job["message"]):
+        if scheduler.resume_job(job_id, sd["expression"], job["chat_id"], job["message"], timezone=WARSAW_TZ.zone):
             await db.update_schedule_pause_status(job_id, False)
             job["is_paused"] = False
             await cq.message.edit_text(
@@ -342,6 +352,32 @@ async def cb_edit_keep_message(
         f"{m['msg_schedule_step3_hint']}"
     )
     await cq.message.answer(text)
+
+
+
+
+# ------------------------------------------------------------------
+# Timezone settings
+# ------------------------------------------------------------------
+
+@router.callback_query(F.data.startswith("set_tz:"))
+async def cb_set_tz(cq: CallbackQuery, translator: TranslationService, db: Database, **_):
+    """Handle timezone selection. Since we use global timezone, just show acknowledgement."""
+    parts = cq.data.split(":")
+    if len(parts) != 2:
+        await cq.answer()
+        return
+
+    tz_name = parts[1]
+    lang = await get_lang(db, cq.from_user.id)
+    
+    # Show that the timezone selection was received
+    msg = f"{translator.get_message('msg_timezone_changed', lang)} {hbold(tz_name)}\n\n"
+    msg += f"{translator.get_message('msg_timezone_global', lang)}"
+    
+    await cq.answer(translator.get_message('msg_timezone_changed', lang))
+    await cq.message.edit_text(msg)
+
 
 
 # ------------------------------------------------------------------

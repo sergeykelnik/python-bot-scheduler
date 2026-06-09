@@ -204,6 +204,7 @@ class Database:
         )
         return row[0] if row and row[0] else default
 
+
     async def set_user_language(self, user_id: int, language: str) -> None:
         await self._execute(
             """
